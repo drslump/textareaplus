@@ -1,0 +1,87 @@
+<html>
+<head>
+    <script language="JavaScript" src="jsunit/app/jsUnitCore.js"></script>
+    
+    <script language="javascript" src="../textAreaPlus/Debug.js"></script>
+    <script language="JavaScript" src="../textAreaPlus/Buffer.js"></script>
+    <script language="JavaScript" src="../textAreaPlus/UnDo.js"></script>
+    <script language="JavaScript">
+        
+        var buf;
+        
+        function setUpPage()
+        {
+            var jsHighlighter = [ 
+            	{
+                    	
+                    'css' : 'comment',
+                    're' : [ '//.*$', null ]
+                },
+                {   'css' : 'comment',
+                    're' : [ '/\\*', '\\*/' ]
+                },
+                {   'css' : 'string',
+                    're' : [ '"', '"' ],
+                    'nested' : [
+                        {
+                            'css' : 'string',
+                            're' : [ '\\\\"', null ]
+                        }
+                    ]
+                    
+                },
+                {   'css' : 'string',
+                    're' : [ "'", "'" ],
+                    'nested' : [
+                        {
+                            'css' : 'string',
+                            're' : [ "\\\\'", null ]
+                        }
+                    ]        
+                },
+                {   'css' : 'keyword',
+                    'keywords' : [ 'var','Array','Object','XMLHTTPRequest','boolean','break','for','in','while','switch','case','default','new','else','if','function','return','with','typeof','true','false','throw','throws','null','this'],
+                    'ignoreCase' : false
+                }
+            ];
+            
+            buf = new TAP_Buffer( jsHighlighter );
+            buf.init( document.getElementById('testText').value );
+            
+            setUpPageStatus = 'complete';
+        }
+        
+        function testBufferLines()
+        {
+            assertEquals('Checking line count', 11, buf.getLineCount());
+            
+            buf.insertLine( 3, '\tvar tmp = new Tmp();' );
+            
+            assertEquals('Checking line count after adding a new line', 12, buf.getLineCount());
+        }
+        
+        function testBufferInsert()
+        {
+            buf.insertChars( 3, 4, 'INSERTED CHARS' );
+            assertEquals('Check inserted chars', 'INSERTED CHARS', buf.getLine(3).source.substr(4, 'INSERTED CHARS'.length) );
+        } 
+    </script>
+</head>
+<body>
+    
+    <h3>JsUnit tests for use in the test runner</h3>
+    
+    <textarea id="testText" name="testText" cols="80" rows="30">
+// this is a comment
+function test( e ) {
+    var sstr = 'single quote string';
+    var dstr = "double quote string";
+    var num = 124.32;
+    /*
+      Multiline comment
+    */
+    alert("This a param for the alert function");    
+}
+    </textarea>
+</body>
+</html>
