@@ -34,6 +34,41 @@
 */
 
 /*
+	Buffer API:
+		
+		Constructor : Setup the buffer so we can use it
+		Destructor  : Destroys the used memory and the buffer can no longer be used
+		
+		read( txt ) : Replaces the contents of the buffer with the content of the parameter
+		write()[txt] : Returns an string with the contents of the buffer as UTF-16
+		clear() : Empties the buffer
+		
+		addMark( name ) : Adds an internal mark at the current position
+		addFixedMark( name ) : Adds an internal mark at the current position which won't have it's position updated
+		removeMark( name ) : Remove a previously added mark
+		getMark( name ) [ row, col ] : get the position of the mark
+		getMarks() [array names] : return a list of marks
+		
+		setCursor( row, col ) : Positions the internal cursor
+		getCursor()[row,col] : Return the current position
+		moveCursor( rows, cols ) : Positions the internal cursos based on the current position
+		
+		getChar()[char] : Return the current character
+		getLine()[lineObj] : Return the current line
+		getString(cnt)[str] : Return a string of cnt chars form the current position
+		
+		getCharCount()[int] : Return the number of chars in the buffer
+		getLineCount()[int] : Return the number of lines in the buffer
+	
+		insertString( str ) : Inserts a string in the buffer
+		delete( cnt ) : Removes a number of chars from the buffer (check +/- of cnt to know the direction)
+		
+		
+			
+*/
+
+
+/*
 The editor must be broken down in several objects:
     - text frame buffer manager
         - syntax parser - data-structure builder

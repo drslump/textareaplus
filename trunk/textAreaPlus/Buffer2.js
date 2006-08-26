@@ -75,9 +75,6 @@ function TAP_Buffer_Line( txt, status ) {
 };
 
 
-
-
-
 /**
  * Setup the buffer so we can use it
  * 
