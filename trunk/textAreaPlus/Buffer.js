@@ -100,7 +100,7 @@ function TAP_Buffer_Line( txt, status ) {
  * @return The requested block
  * @type TAP_Buffer_Block
  */
-TAP_Buffer_Line.prototype.getBlock = function( blk ) {
+TAP_Buffer_Line.prototype.getBlock = function( /** Number */ blk ) {
     return this.blocks[blk];
 };
 
@@ -121,7 +121,7 @@ TAP_Buffer_Line.prototype.getBlockCount = function() {
  * @return The number of chars in the requested block
  * @type Integer
  */
-TAP_Buffer_Line.prototype.getBlockLength = function( blk ) {
+TAP_Buffer_Line.prototype.getBlockLength = function( /** Number */ blk ) {
     if ( this.blocks[blk+1] )
         return this.blocks[blk+1].offset - this.blocks[blk].offset;
     else
@@ -135,7 +135,7 @@ TAP_Buffer_Line.prototype.getBlockLength = function( blk ) {
  * @return The text contents of the requested block
  * @type String
  */
-TAP_Buffer_Line.prototype.getBlockText = function( blk )
+TAP_Buffer_Line.prototype.getBlockText = function( /** Number */ blk )
 {
     if (this.blocks[blk+1])
         return this.source.substring( this.blocks[blk].offset, this.blocks[blk+1].offset );
@@ -152,7 +152,7 @@ TAP_Buffer_Line.prototype.getBlockText = function( blk )
  * @return A tokenizer for the given context
  * @type Object
  */
-TAP_Buffer_Line.prototype.getTokenizerFromState = function ( tokenizer, state )
+TAP_Buffer_Line.prototype.getTokenizerFromState = function ( tokenizer, /** Array */ state )
 {
     var tknz = tokenizer;    
     for (var i=0; i < state.length; i++)
@@ -170,7 +170,7 @@ TAP_Buffer_Line.prototype.getTokenizerFromState = function ( tokenizer, state )
  * @return The final context state
  * @type Array
  */
-TAP_Buffer_Line.prototype.parse = function ( tokenizer, state )
+TAP_Buffer_Line.prototype.parse = function ( tokenizer, /** Array */ state )
 {
     var tknz, startMatch, kwMatch;
     var pos, endPos = 0;
@@ -338,7 +338,7 @@ function TAP_Buffer( hlDef ) {
  * @return A line Object or NULL if the requested line is out of range
  * @type Object
  */
-TAP_Buffer.prototype.getLine = function ( ln, countDeleted )
+TAP_Buffer.prototype.getLine = function ( /** Number */ ln, /** Boolean */ countDeleted )
 {   
     if (typeof ln == 'undefined') ln = this.cursorRow;
      
@@ -361,7 +361,7 @@ TAP_Buffer.prototype.getLine = function ( ln, countDeleted )
  * @return The number of lines
  * @type Integer
  */
-TAP_Buffer.prototype.getLineCount = function( countDeleted )
+TAP_Buffer.prototype.getLineCount = function( /** Boolean */ countDeleted )
 {
     if (countDeleted)
         return this.lines.length;
@@ -446,7 +446,7 @@ TAP_Buffer.prototype.init = function ( txt )
  * @return The array index for the given line
  * @type Integer
  */ 
-TAP_Buffer.prototype.calcLineIndex = function ( ln )
+TAP_Buffer.prototype.calcLineIndex = function ( /** Number */ ln )
 {
     if (typeof ln == 'undefined') ln = this.cursorRow;
     
