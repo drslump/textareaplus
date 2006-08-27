@@ -18,7 +18,7 @@
 */
 
 /**
- * TextArea+ Frame Buffer class
+ * TextArea+ Buffer class
  * @fileoverview The TAP_Buffer is a class which handles a text buffer using a 
  * 'Line Span' algorithm. 
  *
@@ -133,6 +133,9 @@ TAP_Buffer.prototype.clear = function()
 	this.lines = new Array();
 	this.marks = new Object();
 	this.marksFixed = new Object();
+	
+	this.cursorRow = 0;
+	this.cursorCol = 0;
 }
 
 /**
