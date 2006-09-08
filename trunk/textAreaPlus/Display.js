@@ -67,12 +67,7 @@ function TAP_Display( /** HTMLElement */ container )
         this.input.attachEvent( 'onfocus', function(e) { ObjectReference.cursor.enable() } );
         this.input.attachEvent( 'onblur', function(e) { ObjectReference.cursor.disable() } );        
     }
-    
-    //TODO: We should find a way to fetch this values from the source
-    this.charW = 8;
-    this.charH = 16;
-  
-  
+        
     //The caret
     this.cursorElement = document.createElement('SPAN');
     this.cursorElement.id = 'cursor' + this.randomKey;  
@@ -82,7 +77,7 @@ function TAP_Display( /** HTMLElement */ container )
     
     container.appendChild( this.cursorElement );
     this.cursor = new TAP_Cursor( this.cursorElement, this, 500 );
-    this.cursor.setPosition( 0, 0, true );  
+    this.cursor.setPosition( 0, 0, true );
     this.cursor.disable();
 }
 
@@ -136,6 +131,17 @@ TAP_Display.prototype.calcDimensions = function (e)
   
 	this.fbW = this.frame.offsetWidth;
 	this.fbH = this.frame.offsetHeight;  
+	
+    //TODO: Check if this actually works
+    var fontCalcElem = document.createElement('DIV');
+    fontCalcElem.style.position = 'absolute';
+    fontCalcElem.style.visibility = 'hidden';
+    fontCalcElem.style.margin = fontCalcElem.style.padding = 0;
+    fontCalcElem.appendChild( document.createTextNode('j') );
+    this.frame.appendChild( fontCalcElem ); 
+    this.charW = fontCalcElem.offsetWidth ? fontCalcElem.offsetWidth : 8;
+    this.charH = fontCalcElem.offsetHeight ? fontCalcElem.offsetHeight : 16;
+    this.frame.removeChild( fontCalcElem );	
 }
 
 

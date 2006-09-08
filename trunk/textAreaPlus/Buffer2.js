@@ -324,9 +324,6 @@ TAP_Buffer.prototype.getLineCount = function()
 }		
 		
 
-
-
-
 /**
  * Inserts a string in the buffer
  * 
