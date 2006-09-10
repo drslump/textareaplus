@@ -132,6 +132,10 @@ The editor must be broken down in several objects:
 
      
     http://developer.mozilla.org/en/docs/Main_Page
+    
+    
+    Make a PHP program to convert GNU's source-hightlight definitions to TAP ones.?
+    http://www.gnu.org/software/src-highlite/source-highlight.html#Language-Definitions
 */
 
 
@@ -141,7 +145,26 @@ The editor must be broken down in several objects:
 /*
 	Only one keyword clause per level
  */
- 
+/*
+var phpVar = new hlToken( '$\w+(->\w+)?' );
+var phpSingleQuoteString = new hlToken( "'", "'", "\'" );
+var phpDoubleQuoteString = new hlContext( '"', '"', 
+	{
+		'string': new hlSkip('\"'), 	
+		'var' : [
+			phpVar,
+			new hlContext( '(\$\{|\{\$)\w+(->\w+)?', '\}',
+				{
+					'string': phpSingleQuoteString
+				}
+			)
+		],
+	}
+);
+*/
+
+
+
 var phpHighlighter = [
     {
         'css' : 'comment',
