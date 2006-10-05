@@ -161,6 +161,27 @@ var phpDoubleQuoteString = new hlContext( '"', '"',
 		],
 	}
 );
+
+
+Token   //1 expresion
+Context //1 start 1 end
+Escape  //1 expresion
+
+
+[
+	HL.context( 'dblquotestring', '"', '"', 
+		[
+			HL.escape( '\"' ),			
+			HL.token( 'variable', /\$\w+/ ),
+		]
+	),
+	HL.token( 'singlelinecomment', /\/\/.*?$/ )
+]
+
+
+actions('variable').onUpdate( function(){ aaaa } );
+actions('variable').onRender( return 'color: red' ); 
+
 */
 
 
@@ -244,6 +265,9 @@ var phpHighlighter = [
         're' : [ '\\b[+-]?[0-9\\.]+[0-9]*[Ee]?[+-]?[0-9]*\\b', null ]
     }
 ];
+
+
+
 
 var jsHighlighter = [ 
 	{
@@ -403,7 +427,7 @@ function init2( txt )
     txt = txt.replace(/\r/mg,'');//.replace(/\t/mg,'    ');
     document.getElementById('txt').value = txt;
 
-		const spanish_messages = {
+		var spanish_messages = {
 			'Go to line number' : 'Ir a la línea',
 		  'Line number out of range\nPlease enter a value between 1 and ' : 'Número de línea fuera de rango\nPor favor introduzca un valor entre 1 y '
 		};
@@ -412,6 +436,7 @@ function init2( txt )
     hle.newBuffer( txt, htmlHighlighter );    
     hle.renderInnerHTML(true);
 }
+
 </script>
 
 <style type="text/css">

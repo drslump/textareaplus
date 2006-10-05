@@ -37,7 +37,6 @@ var TAP_STATUS_DELETED = 3;
 var TAP_STATUS_CONTENT = 4;
 
 
-
 /**
  * Instantiates a TAP_Buffer_Block object which represents a block in a line of text
  *
@@ -251,11 +250,11 @@ TAP_Buffer.prototype.setCursor = function( /** Number */ row, /** Number */ col 
 /**
  * Returns the current cursor position
  * 
- * @return Array	The current row and column as an array
+ * @return Object	The current row and column as an object
  */
 TAP_Buffer.prototype.getCursor = function()
 {
-	return [ this.cursorRow, this.cursorCol ];
+	return { 'row' : this.cursorRow, 'col' : this.cursorCol };
 }	
 
 /**
@@ -309,6 +308,7 @@ TAP_Buffer.prototype.getString = function( /** Number */ cnt )
  */
 TAP_Buffer.prototype.getCharCount = function()
 {
+	// number of chars plus the number of CR
 	return this.charCount + this.getLineCount();
 }
 
