@@ -298,7 +298,8 @@ TAP_Buffer.prototype.getLine = function()
  */
 TAP_Buffer.prototype.getString = function( /** Number */ cnt )
 {
-	//TODO
+	var s = this.getLine();
+	return s.substr( this.cursorCol, 1 );
 }
 		
 /**
@@ -328,18 +329,67 @@ TAP_Buffer.prototype.getLineCount = function()
  * Inserts a string in the buffer
  * 
  * @param String str	The string to insert
+ * @return Int	Actually inserted chars
  */
 TAP_Buffer.prototype.insert = function( /** String */ str )
 {
-	//TODO
+	var inserted = 0;
+	var lines = str.split('\n');
+	
+	var s = this.getLine();	
+	
+	for (var i=0; i<lines.length; i++)
+	{
+		if (i === 0)
+		{
+			this.lines[this.cursorRow].source = s.substr( 0, this.cursorCol );	
+			this.lines[this.cursorRow].dirty = TAP_STATUS_CHANGED;		 
+		}
+		else
+		{
+			// make room for a new line		
+			this.lines.splice( this.cursorRow+i, 0, new TAP_Buffer_Line() );
+			this.lines[this.cursorRow+i].dirty = TAP_STATUS_INSERTED;		 
+		}
+				
+		this.lines[this.cursorRow+i].source += lines[i];
+		
+		inserted += lines[i].length;
+	}
+	
+	this.lines[this.cursorRow + i - 1].source += s.substr( this.cursorCol );
+	this.charCount += inserted;
+	
+	return inserted;
 }
 
 /**
  * Removes N chars from the buffer
  * 
  * @param Number cnt	The number of chars to remove
+ * @return int	Actually removed chars
  */
 TAP_Buffer.prototype.remove = function( /** Number */ cnt )
 {
-	//TODO
+	var s, r;
+	var row = this.cursorRow;
+	var col = this.cursorCol;
+	var removed = 0;
+	while (removed < cnt)
+	{
+		if (typeof this.lines[row] == 'undefined')
+			break;
+			
+		s = this.lines[row].source;
+		
+		r = s.substr(col, cnt-removed);
+		s = s.substr(0, col) + s.substr(cnt-removed);
+		
+		removed += r.length;
+
+		row++;
+		col = 0;
+	}
+	this.charCount -= removed;	
+	return removed;
 }
