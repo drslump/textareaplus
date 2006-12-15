@@ -366,15 +366,40 @@ TAP_Buffer.prototype.insert = function( /** String */ str )
 /**
  * Removes N chars from the buffer
  * 
- * @param Number cnt	The number of chars to remove
+ * @param Number cnt	The number of chars to remove (negative values allowed)
  * @return int	Actually removed chars
  */
 TAP_Buffer.prototype.remove = function( /** Number */ cnt )
 {
-	var s, r;
+	var s, r, removed;
+	
+	//Handle negative argument
+	if (cnt < 0)
+	{
+		removed = 0;
+		while ( removed < cnt)
+		{
+			removed++;
+			this.cursorCol--;
+			
+			if (this.cursorCol == 0)
+			{
+				if (this.cursorRow < 1)
+				{
+					break;
+				}
+				this.cursorRow--;
+				this.cursorCol = this.getLine().length; 
+			}
+		}
+		
+		cnt = removed;
+	}
+	
 	var row = this.cursorRow;
 	var col = this.cursorCol;
-	var removed = 0;
+	
+	removed = 0;
 	while (removed < cnt)
 	{
 		if (typeof this.lines[row] == 'undefined')
