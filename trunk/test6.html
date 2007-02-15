@@ -1,0 +1,304 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Insert title here</title>
+
+<script language="javascript">
+
+/*
+
+	Another JS lexer: SourceMap http://www.devpro.it/code/126.html
+	PHP version: http://www.phpclasses.org/browse/package/3279.html
+	
+	
+	
+
+
+*/
+
+function LexerContext( name, startRule, endRule, rules ) 
+{
+	this.name = name;
+	
+	if (typeof(startRule) == 'function')
+		this.re = String(startRule).substring( String(startRule).indexOf('/')+1, String(startRule).lastIndexOf('/') );
+	else
+		this.re = startRule;
+	
+	// find capturing parenthesis by removing the escaped backslashes first...
+	var reStr = this.re.replace(/\\\\/g, '');
+	// and get all non-escaped parenthesis not followed by a question mark
+	var result = reStr.match( /([^\\]|^)\(([^\?]|$)/g );
+	if (result)
+		this.parenthesis = result.length;
+	else
+		this.parenthesis = 0;
+
+	if (typeof(endRule) == 'function')
+		this.endRe = String(endRule).substring( String(endRule).indexOf('/')+1, String(endRule).lastIndexOf('/') );
+	else
+		this.endRe = endRule;
+	
+	this.rules = rules;
+}
+
+function LexerToken( name, rule )
+{
+	this.name = name;
+	
+	if (typeof(rule) == 'function')
+		this.re = String(rule).substring( String(rule).indexOf('/')+1, String(rule).lastIndexOf('/') );
+	else
+		this.re = rule;	
+}
+
+
+function BuildLexer( definition, endRe, parent )
+{
+    var token;
+    var tokenizer = {
+    	'parent': parent ? parent : null,
+    	're'	: null,
+    	'tokens': []
+    };
+    var tokensReArr = [];
+    
+    for (var i=0; i < definition.length; i++)
+    {
+    	token = {
+    		'name'			: definition[i].name,
+    		'prevContext'	: tokenizer,
+    		'nextContext'	: null,
+    		'parenthesis'	: definition[i].parenthesis ? definition[i].parenthesis : 0,    		
+    	};
+    	
+    	if (definition[i].rules)
+    		token.nextContext = BuildLexer( definition[i].rules, definition[i].endRe, token );
+       	
+		tokensReArr.push( definition[i].re );
+       	tokenizer.tokens.push( token );
+    }
+    
+	if (endRe)
+		tokensReArr.push( endRe );
+	
+	if (tokensReArr.length)
+	{
+		tokenizer.re = new RegExp( '(' + tokensReArr.join(')|(') + ')', 'g' );
+		tokenizer.template = '(' + tokensReArr.join(')|(') + ')';
+	}
+
+	return tokenizer;
+}
+
+
+
+// define some commonly used constructs
+// Note: Rules can be defined as a string or as a regexp literal
+
+// match a complex-parsing-variable like ${foo}, {$foo->bar}, ${foo['bar'][2]} ...
+var PHPComplexParsingVariable = new LexerContext( 'Variable', /(?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/, /\}/,
+	[
+		// Operators
+		new LexerToken( 'Operator', /->|[\[\]]/ ),
+		// Keywords
+		new LexerToken( 'Ident', /\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b/ ),		
+		// match single-quoted no-multiline strings supporting \'
+		new LexerToken( 'SingleQuoteString', /'[^'\\]*(?:\\.[^'\\]*)*'/ )
+	]
+);
+
+// match a parsing-variable like $foo or $foo->bar
+var PHPSimpleParsingVariable = new LexerToken( 'Variable', /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/ );
+
+
+//Order matters!
+var Lexer_Definition_PHP = [
+	// single-line comments, either // or # style
+	new LexerToken( 'SingleLineComment', /(?:\/\/|#).*$/ ),
+	// multi-line comments
+	//new LexerContext( 'MultiLineComment', /\/\*/, /\*\//, [] ),
+	new LexerContext( 'MultiLineComment', /(\/)(\*)/, /#BACKREFERENCE2##BACKREFERENCE1#/, [] ),
+
+	// match double-quoted-strings with support for parsing variables
+	new LexerContext( 'DoubleQuoteString', /"/, /"/,
+		[
+			// match \", \$ and the like			
+			new LexerToken( 'Backslash', /\\./ ),
+			PHPComplexParsingVariable,
+			PHPSimpleParsingVariable
+			
+		]
+	),
+	// Heredoc strings
+	new LexerContext( 'HeredocString', /<<<([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$/, /^#BACKREFERENCE1#;?$/, 
+		[
+			// match \$
+			new LexerToken( 'Backslash', /\\\$/ ),
+			PHPComplexParsingVariable,
+			PHPSimpleParsingVariable
+		]
+	),
+	// match single-quoted multiline strings supporting \'
+	new LexerContext( 'SingleQuoteString', /'/, /'/,
+		[
+			// match \'
+			new LexerToken( 'Backslash', /\\'/ )
+		]
+	),
+
+	// Variables
+	new LexerToken( 'Variable', /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/ ),
+	
+	// Numbers
+	new LexerToken( 'NumberHex', /\b[+-]?0[Xx][0-9A-Fa-f]+\b/ ),
+	new LexerToken( 'NumberFloat', /\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b/ ),
+	new LexerToken( 'NumberOctal', /\b[+-]?0[0-9]+\b/ ),
+	new LexerToken( 'NumberInt', /\b[+-]?[0-9]+\b/ ), 
+
+	// Operators
+	// TODO: optimize it by placing the single-char operators in a class [\.~<>]
+	new LexerToken( 'Operator', /~|\|\||\|\=|\||\^\=|\^|@|\?|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|<\=|<<\=|<<|<|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&\=|&&|&|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;/ ),	
+		
+	// Keywords
+	new LexerToken( 'Ident', /\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b/ )
+];
+
+
+var Lexer_Definition_JS = [
+	new LexerToken( 'SingleLineComment', /\/\/.*?$/ ),
+	new LexerContext( 'MultiLineComment', /\/\*/, /\*\//, [] ),
+
+	// match single-quoted multiline strings supporting \'
+	new LexerContext( 'SingleQuoteString', /'/, /'/,
+		[
+			// match \'
+			new LexerToken( 'Backslash', /\\'/ )
+		]
+	),	
+	// match double-quoted-strings with support for parsing variables
+	new LexerContext( 'DoubleQuoteString', /"/, /"/,
+		[
+			// match \", \$ and the like			
+			new LexerToken( 'Backslash', /\\./ ),
+			PHPComplexParsingVariable,
+			PHPSimpleParsingVariable			
+		]
+	),
+	
+	
+
+//console.log(lexer.toSource());
+
+function addLexem( token, value )
+{
+	console.log('LEXEM %s: %s', token.name, value);
+}
+
+
+function parseLine( src, token )
+{       
+    var escapeRe = /[\|\[\]\(\)\^\$\.\*\+\?\!\{\}\,\=\\]/g;
+    
+    var pos = 0;
+    var idx, tkn;
+    
+    var match;
+    var dinamic;
+    
+    // Set the current context
+    var ctx = token.nextContext;
+    
+    //console.log( token.nextContext.re.toSource() );
+      
+	//reset the regular expression
+    ctx.re.lastIndex = 0;
+    // find next token
+    while ( (match = ctx.re.exec( src )) !== null )
+    {
+    	//console.log('Match: %s (endPos: %d, index: %d) Re: ', match[0], endPos, match.index, ctx.re.toSource());
+    	
+    	dinamic = false;
+    	
+		// add the unmatched text before the found token
+		if ( pos < match.index )
+			addLexem( ctx.parent, src.substring( pos, match.index ) );
+
+		// loop thru the captured parenthesis to find the matched token
+        for (idx=1, tkn=0; tkn < ctx.tokens.length; idx++, tkn++)
+        { 
+        	if (match[idx])
+        		break;
+        	// make sure we take into account the dinamic rules which use parenthesis too
+        	if (ctx.tokens[tkn].parenthesis)
+        		idx += ctx.tokens[tkn].parenthesis;
+        }
+        
+       	// check if the end of context one was
+       	if (!ctx.tokens[tkn])
+       	{
+           	//console.log('END OF CONTEXT FOUND: %s', match[0]);
+
+           	addLexem( ctx.parent, match[0] );
+
+           	ctx = ctx.parent.prevContext;
+       	}
+       	// The token opens a new context        	
+       	else if (ctx.tokens[tkn].nextContext)
+       	{
+       		addLexem( ctx.tokens[tkn], match[0] );
+
+			//console.log('START OF CONTEXT FOUND (' + ctx.tokens[tkn].name + ') : ' + match[0]);
+
+			// we have matched a dinamic context, so we need to rebuild the escape rule
+            if (ctx.tokens[tkn].parenthesis)
+            {
+            	// replace all the back-references place holders with their actual content 
+            	dinamic = ctx.tokens[tkn].nextContext.template;
+                for (i=1; i<=ctx.tokens[tkn].parenthesis; i++)
+                {
+                	if (match[idx+i])
+                  		dinamic = dinamic.replace( '#BACKREFERENCE'+i+'#', match[idx+i].replace( escapeRe, '\\$&' ) );
+				}
+			}
+
+			// move to the new context
+            ctx = ctx.tokens[tkn].nextContext;
+            // if it's dinamic then we rebuild the regular expression
+            if (dinamic)
+				ctx.re = new RegExp( dinamic, 'g' );
+       	}
+       	// Simple token
+       	else
+       	{
+			addLexem( ctx.tokens[tkn], match[0] );
+       	}
+
+       	pos = match.index + match[0].length;
+        
+      	ctx.re.lastIndex = pos;
+	}
+	
+	// remaining text
+	if (pos < src.length)
+		addLexem( ctx.parent, src.substring(pos) );
+}
+
+
+var phpLexer = { 
+	'name'			: 'php',
+	'prevContext'	: null
+};
+phpLexer.nextContext = BuildLexer( Lexer_Definition_PHP, '', phpLexer );
+
+
+parseLine( ' $var /* as */ function test("Hello {$world->arr[\'mine\']}");', phpLexer );
+//console.log( phpLexer.toSource() );
+</script>
+
+</head>
+<body>
+<div id="out"></div>
+</body>
+</html>
