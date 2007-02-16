@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definition lang="PHP">
+
+	<alias name="PHPComplexParsingVariable">
+	
+	</alias>
+	<alias name="PHPSimpleParsingVariable">
+	
+	</alias>	
+	
+
+	<token name="SingleLineComment" re="(?:\/\/|#).*$" />
+	<context name="MultiLineComment" start="\/\*" end="\*\/">
+	</context>
+
+	<context name="DoubleQuoteString" start="\&quot;" end="\&quot;">
+		<token name="Backslash" re="\\." />
+		<alias ref="PHPComplexParsingVariable" />
+		<alias ref="PHPSimpleParsingVariable" />
+	</context>
+	<context name="HeredocString" start="&lt;&lt;&lt;([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$" end="^#BACKREFERENCE1#;?$">
+		<token name="Backslash" re="\\\$" />
+		<alias ref="PHPComplexParsingVariable" />
+		<alias ref="PHPSimpleParsingVariable" />
+	</context>
+	<context name="SingleQuoteString" start="'" end="'">
+		<token name="Backslash" re="\\'" />
+	</context>
+
+	<token name="Variable" re="\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" />
+	
+	<token name="NumberHex" re="\b[+-]?0[Xx][0-9A-Fa-f]+\b" />
+	<token name="NumberFloat" re="\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b" />
+	<token name="NumberOctal" re="\b[+-]?0[0-9]+\b" />
+	<token name="NumberInt" re="\b[+-]?[0-9]+\b" />
+
+	<token name="Operator" re="~|\|\||\|\=|\||\^\=|\^|@|\?|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|&lt;\=|&lt;&lt;\=|&lt;&lt;|&lt;|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&amp;\=|&amp;&amp;|&amp;|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;" />
+		
+	<token name="Ident" re="\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b" />
+</definition>
