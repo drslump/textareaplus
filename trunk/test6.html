@@ -97,7 +97,6 @@ function BuildLexer( definition, endRe, parent )
 }
 
 
-
 // define some commonly used constructs
 // Note: Rules can be defined as a string or as a regexp literal
 
@@ -169,6 +168,15 @@ var Lexer_Definition_PHP = [
 	new LexerToken( 'Ident', /\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b/ )
 ];
 
+var Lexer_Definition_HTML = [
+	new LexerContext( 'Tag', /<[A-Za-z_]+[A-Za-z0-9_]*/, />/,
+		[
+			new LexerToken( 'Attribute', /[A-Za-z_]+[A-Za-z0-9_]*/ ),
+			new LexerToken( 'Value', /(?<=\=\s*)(?:"[^"]+"|[^\s>]+)/ ),
+		]
+	),
+	new LexerToken( 'EndTag', /<\/[A-Za-z_]+[A-Za-z0-9_]*>/ )
+];
 
 
 var Lexer_Definition_JS = [
@@ -262,7 +270,6 @@ function parseLine( src, token )
        	if (!ctx.tokens[tkn])
        	{
            	//console.log('END OF CONTEXT FOUND: %s', match[0]);
-
            	addLexem( ctx.parent, match[0] );
 
            	ctx = ctx.parent.prevContext;
@@ -271,7 +278,6 @@ function parseLine( src, token )
        	else if (ctx.tokens[tkn].nextContext)
        	{
        		addLexem( ctx.tokens[tkn], match[0] );
-
 			//console.log('START OF CONTEXT FOUND (' + ctx.tokens[tkn].name + ') : ' + match[0]);
 
 			// we have matched a dinamic context, so we need to rebuild the escape rule
@@ -312,7 +318,7 @@ var phpLexer = {
 	'name'			: 'php',
 	'prevContext'	: null
 };
-phpLexer.nextContext = BuildLexer( Lexer_Definition_JS, '', phpLexer );
+phpLexer.nextContext = BuildLexer( Lexer_Definition_PHP, '', phpLexer );
 
 //parseLine('/* comment  */ $var = new myClass(\'one\');', phpLexer);
 
