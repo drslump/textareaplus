@@ -1,47 +1,64 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <definition lang="PHP">
 
-	<template id="PHPComplexParsingVariable">
-		<context name="Variable" start="(?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" end="\}">
-			<token name="Operator" re="->|[\[\]]" />
-			<token name="Ident" re="\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b" />
-			<token name="SingleQuoteString" re="'[^'\\]*(?:\\.[^'\\]*)*'" />	
-		</context>
-	</template>
-	<template id="PHPSimpleParsingVariable">
-		<token name="Variable" re="\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" />
-	</template>
-	
-	<context name="PHP" start="&lt;\?(?:php\b|=|\s|$)" end="\?>">
-	
-	<token name="SingleLineComment" re="(?:\/\/|#).*$" />
-	<context name="MultiLineComment" start="\/\*" end="\*\/">
-	</context>
-
-	<context name="DoubleQuoteString" start="&quot;" end="&quot;">
-		<token name="Backslash" re="\\." />
-		<template ref="PHPComplexParsingVariable" />
-		<template ref="PHPSimpleParsingVariable" />
-	</context>
-	<context name="HeredocString" start="&lt;&lt;&lt;([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$" end="^#BACKREFERENCE1#;?$">
-		<token name="Backslash" re="\\\$" />
-		<template ref="PHPComplexParsingVariable" />
-		<template ref="PHPSimpleParsingVariable" />
-	</context>
-	<context name="SingleQuoteString" start="'" end="'">
-		<token name="Backslash" re="\\'" />
-	</context>
-
-	<token name="Variable" re="\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" />
-	
-	<token name="NumberHex" re="\b[+-]?0[Xx][0-9A-Fa-f]+\b" />
-	<token name="NumberFloat" re="\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b" />
-	<token name="NumberOctal" re="\b[+-]?0[0-9]+\b" />
-	<token name="NumberInt" re="\b[+-]?[0-9]+\b" />
-
-	<token name="Operator" re="~|\|\||\|\=|\||\^\=|\^|@|\?(?!>)|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|&lt;\=|&lt;&lt;\=|&lt;&lt;|&lt;|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&amp;\=|&amp;&amp;|&amp;|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;" />
+	<templates>
+		<template id="PHPComplexParsingVariable">
+			<rule name="Variable" start="(?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" end="\}">
+				<rule name="Operator" start="-&gt;|[\[\]]" />
+				<rule name="Ident" start="\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b" />
+				<rule name="SingleQuoteString" start="'[^'\\]*(?:\\.[^'\\]*)*'" />	
+			</rule>
+		</template>
+		<template id="PHPSimpleParsingVariable">
+			<rule name="Variable" start="\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" />
+		</template>	
+	</templates>
 		
-	<token name="Ident" re="\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b" />
+	<rules>
+		<rule name="PHP" start="&lt;\?(?:[pP][hH][pP]\b|=|\s|$)" end="\?&gt;">		
+			<rule name="SingleLineComment" start="(?:\/\/|#).*$" />
+			<rule name="MultiLineComment" start="\/\*" end="\*\/" />
+		
+			<rule name="DoubleQuoteString" start="&quot;" end="&quot;">
+				<rule name="Backslash" start="\\." />
+				<template ref="PHPComplexParsingVariable" />
+				<template ref="PHPSimpleParsingVariable" />
+			</rule>			
+			<rule name="HeredocString" start="&lt;&lt;&lt;([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$" end="^#BACKREFERENCE1#;?$">
+				<rule name="Backslash" start="\\\$" />
+				<template ref="PHPComplexParsingVariable" />
+				<template ref="PHPSimpleParsingVariable" />
+			</rule>
+			<rule name="SingleQuoteString" start="'" end="'">
+				<rule name="Backslash" start="\\'" />
+			</rule>
 	
-	</context>
+			<rule name="Variable" start="\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" />
+		
+			<rule name="NumberHex" start="\b[+-]?0[Xx][0-9A-Fa-f]+\b" />
+			<rule name="NumberFloat" start="\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b" />
+			<rule name="NumberOctal" start="\b[+-]?0[0-9]+\b" />
+			<rule name="NumberInt" start="\b[+-]?[0-9]+\b" />
+	
+			<rule name="Operator" start="~|\|\||\|\=|\||\^\=|\^|@|\?(?!&gt;)|&gt;&gt;\=|&gt;&gt;|&gt;\=|&gt;|\=\=\=|\=\=|\=|&lt;\=|&lt;&lt;\=|&lt;&lt;|&lt;|::|:|\/\=|\/|\.\=|\.|-&gt;|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&amp;\=|&amp;&amp;|&amp;|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;" />
+			
+			<rule name="Ident" start="\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b" />		
+		</rule>
+	</rules>
+	
+	<tests>	
+		<test>
+			<payload><![CDATA[
+&lt;?php $var = "Hello World";			
+			]]></payload>
+			<result>
+				<assert rule="PHP" extra="open" offset="0" length="5" />
+				<assert rule="Variable" offset="6" length="4" />
+				<assert rule="Operator" offset="11" length="1" />
+				<assert rule="DoubleQuoteString" extra="open" offset="13" length="1" />
+				<assert rule="DoubleQuoteString" extra="close" offset="25" length="1" />
+				<assert rule="Operator" offset="26" length="1" />
+			</result>
+		</test>
+	</tests>
 </definition>
