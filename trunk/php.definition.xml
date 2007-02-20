@@ -1,27 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <definition lang="PHP">
 
-	<alias name="PHPComplexParsingVariable">
+	<template id="PHPComplexParsingVariable">
+		<context name="Variable" start="(?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" end="\}">
+			<token name="Operator" re="->|[\[\]]" />
+			<token name="Ident" re="\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b" />
+			<token name="SingleQuoteString" re="'[^'\\]*(?:\\.[^'\\]*)*'" />	
+		</context>
+	</template>
+	<template id="PHPSimpleParsingVariable">
+		<token name="Variable" re="\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" />
+	</template>
 	
-	</alias>
-	<alias name="PHPSimpleParsingVariable">
+	<context name="PHP" start="&lt;\?(?:php\b|=|\s|$)" end="\?>">
 	
-	</alias>	
-	
-
 	<token name="SingleLineComment" re="(?:\/\/|#).*$" />
 	<context name="MultiLineComment" start="\/\*" end="\*\/">
 	</context>
 
-	<context name="DoubleQuoteString" start="\&quot;" end="\&quot;">
+	<context name="DoubleQuoteString" start="&quot;" end="&quot;">
 		<token name="Backslash" re="\\." />
-		<alias ref="PHPComplexParsingVariable" />
-		<alias ref="PHPSimpleParsingVariable" />
+		<template ref="PHPComplexParsingVariable" />
+		<template ref="PHPSimpleParsingVariable" />
 	</context>
 	<context name="HeredocString" start="&lt;&lt;&lt;([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$" end="^#BACKREFERENCE1#;?$">
 		<token name="Backslash" re="\\\$" />
-		<alias ref="PHPComplexParsingVariable" />
-		<alias ref="PHPSimpleParsingVariable" />
+		<template ref="PHPComplexParsingVariable" />
+		<template ref="PHPSimpleParsingVariable" />
 	</context>
 	<context name="SingleQuoteString" start="'" end="'">
 		<token name="Backslash" re="\\'" />
@@ -34,7 +39,9 @@
 	<token name="NumberOctal" re="\b[+-]?0[0-9]+\b" />
 	<token name="NumberInt" re="\b[+-]?[0-9]+\b" />
 
-	<token name="Operator" re="~|\|\||\|\=|\||\^\=|\^|@|\?|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|&lt;\=|&lt;&lt;\=|&lt;&lt;|&lt;|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&amp;\=|&amp;&amp;|&amp;|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;" />
+	<token name="Operator" re="~|\|\||\|\=|\||\^\=|\^|@|\?(?!>)|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|&lt;\=|&lt;&lt;\=|&lt;&lt;|&lt;|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&amp;\=|&amp;&amp;|&amp;|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;" />
 		
 	<token name="Ident" re="\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b" />
+	
+	</context>
 </definition>
