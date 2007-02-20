@@ -91,62 +91,63 @@ function BuildLexer( definition, endRe, parent )
 		parent.re = new RegExp( parent.template, 'g' );
 	}
 
-	console.log( parent );
-
 	return rules;
 }
 
-/*
-function LoadDefinitionXML( file )
+
+function XML2Definition( xmldoc )
 {
-	var xmlDoc;
-	
-	function processXML()
+	function parseContext( elm, templates )
 	{
-		function parseContext( elm )
-		{
+		var def = [];
 		
+		for (var j=0; j<elm.childNodes.length; j++)
+		{
+			if (elm.childNodes[j].nodeType != 1)
+				continue;
+				
+			if (elm.childNodes[j].nodeName == 'template' && elm.childNodes[j].hasAttribute('id'))
+			{
+				templates[ elm.childNodes[j].getAttribute('id') ] = parseContext( elm.childNodes[j], templates );
+				//console.log('TEMPLATE');
+			}
+			else if (elm.childNodes[j].nodeName == 'template')
+			{
+				if (templates[ elm.childNodes[j].getAttribute('ref') ])
+					def = def.concat( templates[ elm.childNodes[j].getAttribute('ref') ] );
+				//console.log('TEMPLATE REF');
+			}
+			else if (elm.childNodes[j].nodeName == 'token')
+			{	
+				def.push(
+					new LexerToken( elm.childNodes[j].getAttribute('name'), elm.childNodes[j].getAttribute('re') )
+				);
+				//console.log('TOKEN');
+			}
+			else if (elm.childNodes[j].nodeName == 'context')
+			{	
+				def.push( 
+					new LexerContext( elm.childNodes[j].getAttribute('name'), elm.childNodes[j].getAttribute('start'), elm.childNodes[j].getAttribute('end'), 
+						parseContext( elm.childNodes[j], templates )
+					)
+				);
+				//console.log('CONTEXT');
+			}
+			
 		}	
-	
-		var x, lang, j;
-		
-		console.log(xmlDoc);
-		
-		x = xmlDoc.firstChild; //<definition
-		lang = x.getAttribute('lang');
-		
-		console.log('Lang: ' + lang + ' - N: ' + x.childNodes.length);
-		
-		for (j=0; j<x.childNodes.length; j++)
-		{
-			console.log( 'NN: ' + j + ' - ' + x.childNodes[j] );			
-		}
+		//console.log(def);
+		return def;	
 	}
-	
-	
-	if (document.implementation && document.implementation.createDocument)
-	{
-		xmlDoc = document.implementation.createDocument("", "", null);
-		xmlDoc.onload = processXML;
-	}
-	else if (window.ActiveXObject)
-	{
-		xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
-		xmlDoc.onreadystatechange = function () {
-			if (xmlDoc.readyState == 4) processXML()			
-		};
- 	}
-	else
-	{
-		alert('Your browser can\'t handle this script');
-		return;
-	}
-	
-	xmlDoc.load( file );
+
+	var lang = xmldoc.firstChild.getAttribute('lang');	
+	var templates = {};
+	return parseContext( xmldoc.firstChild, templates );
 }
 
-LoadDefinitionXML( 'php.definition.xml' );
-*/
+
+
+
+
 
 // define some commonly used constructs
 // Note: Rules can be defined as a string or as a regexp literal
@@ -169,54 +170,59 @@ var PHPSimpleParsingVariable = new LexerToken( 'Variable', /\$[a-zA-Z_\x7f-\xff]
 
 //Order matters!
 var Lexer_Definition_PHP = [
-	// single-line comments, either // or # style
-	new LexerToken( 'SingleLineComment', /(?:\/\/|#).*$/ ),
-	// multi-line comments
-	new LexerContext( 'MultiLineComment', /\/\*/, /\*\//, [] ),
-	//new LexerContext( 'MultiLineComment', /(\/)(\*)/, /#BACKREFERENCE2##BACKREFERENCE1#/, [] ),
-
-	// match double-quoted-strings with support for parsing variables
-	new LexerContext( 'DoubleQuoteString', /"/, /"/,
-		[
-			// match \", \$ and the like			
-			new LexerToken( 'Backslash', /\\./ ),
-			PHPComplexParsingVariable,
-			PHPSimpleParsingVariable
-			
-		]
-	),
-	// Heredoc strings
-	new LexerContext( 'HeredocString', /<<<([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$/, /^#BACKREFERENCE1#;?$/, 
-		[
-			// match \$
-			new LexerToken( 'Backslash', /\\\$/ ),
-			PHPComplexParsingVariable,
-			PHPSimpleParsingVariable
-		]
-	),
-	// match single-quoted multiline strings supporting \'
-	new LexerContext( 'SingleQuoteString', /'/, /'/,
-		[
-			// match \'
-			new LexerToken( 'Backslash', /\\'/ )
-		]
-	),
-
-	// Variables
-	new LexerToken( 'Variable', /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/ ),
-	
-	// Numbers
-	new LexerToken( 'NumberHex', /\b[+-]?0[Xx][0-9A-Fa-f]+\b/ ),
-	new LexerToken( 'NumberFloat', /\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b/ ),
-	new LexerToken( 'NumberOctal', /\b[+-]?0[0-9]+\b/ ),
-	new LexerToken( 'NumberInt', /\b[+-]?[0-9]+\b/ ), 
-
-	// Operators
-	// TODO: optimize it by placing the single-char operators in a class [\.~<>]
-	new LexerToken( 'Operator', /~|\|\||\|\=|\||\^\=|\^|@|\?|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|<\=|<<\=|<<|<|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&\=|&&|&|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;/ ),	
+	new LexerContext( 'PHP', /<\?(?:[Pp][Hh][Pp]\b|=|\s|$)/, /\?>/,
+		[				
+			// single-line comments, either // or # style
+			new LexerToken( 'SingleLineComment', /(?:\/\/|#).*$/ ),
+			// multi-line comments
+			new LexerContext( 'MultiLineComment', /\/\*/, /\*\//, [] ),
+			//new LexerContext( 'MultiLineComment', /(\/)(\*)/, /#BACKREFERENCE2##BACKREFERENCE1#/, [] ),
 		
-	// Keywords
-	new LexerToken( 'Ident', /\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b/ )
+			// match double-quoted-strings with support for parsing variables
+			new LexerContext( 'DoubleQuoteString', /"/, /"/,
+				[
+					// match \", \$ and the like			
+					new LexerToken( 'Backslash', /\\./ ),
+					PHPComplexParsingVariable,
+					PHPSimpleParsingVariable
+					
+				]
+			),
+			// Heredoc strings
+			new LexerContext( 'HeredocString', /<<<([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$/, /^#BACKREFERENCE1#;?$/, 
+				[
+					// match \$
+					new LexerToken( 'Backslash', /\\\$/ ),
+					PHPComplexParsingVariable,
+					PHPSimpleParsingVariable
+				]
+			),
+			// match single-quoted multiline strings supporting \'
+			new LexerContext( 'SingleQuoteString', /'/, /'/,
+				[
+					// match \'
+					new LexerToken( 'Backslash', /\\'/ )
+				]
+			),
+		
+			// Variables
+			new LexerToken( 'Variable', /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/ ),
+			
+			// Numbers
+			new LexerToken( 'NumberHex', /\b[+-]?0[Xx][0-9A-Fa-f]+\b/ ),
+			new LexerToken( 'NumberFloat', /\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b/ ),
+			new LexerToken( 'NumberOctal', /\b[+-]?0[0-9]+\b/ ),
+			new LexerToken( 'NumberInt', /\b[+-]?[0-9]+\b/ ), 
+		
+			// Operators
+			// TODO: optimize it by placing the single-char operators in a class [\.~<>]
+			// NOTE: for the ? operator we use a 'look-ahead' to ensure that it's not followed by > '\?(?!>)', since it would match the end of PHP block
+			new LexerToken( 'Operator', /~|\|\||\|\=|\||\^\=|\^|@|\?(?!>)|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|<\=|<<\=|<<|<|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&\=|&&|&|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;/ ),	
+				
+			// Keywords
+			new LexerToken( 'Ident', /\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b/ )
+		]
+	)
 ];
 
 var Lexer_Definition_HTML = [
@@ -359,22 +365,59 @@ function parseLine( src, rule )
 	// remaining text
 	if (pos < src.length)
 		addLexem( rule, src.substring(pos) );
+		
+	return rule;
 }
 
+
+
+var xmlDef;
+var xmlDoc;	
+if (document.implementation && document.implementation.createDocument)
+{
+	xmlDoc = document.implementation.createDocument("", "", null);
+	xmlDoc.onload = function () { xmlDef = XML2Definition(xmlDoc) };
+}
+else if (window.ActiveXObject)
+{
+	xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
+    xmlDoc.async = false; 	
+	xmlDoc.onreadystatechange = function () {
+		if (xmlDoc.readyState == 4) xmlDef = XML2Definition(xmlDoc);			
+	};
+}
+else
+{
+	alert('Your browser can\'t handle this script');
+}
+
+xmlDoc.load( 'php.definition.xml' );
+
+
+
 var phpLexer = { 
-	'name'			: 'php',
+	'name'			: 'text',
 	'parentRule'	: null
 };
 phpLexer.childRules = BuildLexer( Lexer_Definition_PHP, '', phpLexer );
 
-
-console.log(phpLexer);
+//console.log(phpLexer);
 
 
 //parseLine('/* comment  */ $var = new myClass(\'one\');', phpLexer);
 
 function doIt()
 {
+	console.log('XML');
+	console.log( xmlDef );
+
+
+//phpLexer.childRules = BuildLexer( xmlDef, '', phpLexer );
+
+//parseLine('<?PHP /* comment  */ ?> $var = new myClass(\'one\');', phpLexer);
+//return;
+
+
 	var src = "	\n\
 <?php\n\
 \n\
@@ -596,7 +639,7 @@ class MyFLV extends FLV {\n\
 /* comment */ \"this $var this\" \n\
 /* comment */ \"this $var this\" \n\
 /* comment */ \"this $var this\" \n\
-/* comment */ \"this $var this\" \n\
+/* comment */ \"this ${var->test} this\" \n\
 \n\
 $flv = new MyFLV();\n\
 try {\n\
@@ -619,12 +662,12 @@ echo \"<pre>\" . print_r($flv->getMetaData(), true) . \"</pre>\";\n\
 \n\
 $flv->close();	\n\
 ?>";
-
+	var r = phpLexer;
 	var txtLines = src.split(/\r\n|\r|\n/);
 	for (var i=0; i<txtLines.length; i++)
 	{
 		//parseLine( ' $var /* as */ function test("Hello {$world->arr[\'mine\']}");', phpLexer );
-		parseLine( txtLines[i], phpLexer );
+		r = parseLine( txtLines[i], r );
 	}
 }
 //console.log( phpLexer.toSource() );
