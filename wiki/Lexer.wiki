@@ -1,6 +1,4 @@
 #labels Phase-Design
-#Documentation on the lexer component
-
 = Introduction =
 
 As a mean to support advanced features like syntax highlighting, code completion, brace matching... there must be a way to analyze the text and split the contents into smaller units which offer a bit more of information. To perform this action we use a simple lexer which is able to scan the text and according to a set of rules divide it into smaller chunks known as _lexems_ or _tokens_.
