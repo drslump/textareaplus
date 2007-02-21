@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definition lang="XML">
+
+	<templates>	
+		<template id="XML_Entities">
+			<rule name="Entity" start="&amp;[A-Za-z]+;" />
+			<rule name="Unicode" start="&amp;#[0-9]+;" />
+		</template>
+	</templates>
+	
+	<!-- Order of the rules matters -->	
+	<rules>
+		<rule name="Tag" start="&lt;[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*" end=">">
+			<rule name="Attribute" start="[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*" />
+			<rule name="Operator" start="=" />
+			<rule name="Value" start="([&quot;|'])" end="\1">
+				<template ref="XML_Entities" />
+			</rule>
+		</rule>
+		
+		<template ref="XML_Entities" />
+		
+		<rule name="EndTag" start="&lt;\/[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*>" />
+	</rules>
+	
+	<tests>	
+	</tests>
+</definition>
