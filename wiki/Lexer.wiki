@@ -11,7 +11,7 @@ A _Regular Expression_ is a sequence of characters, control codes and mathematic
 
 = How it works =
 
-Most _regular expression_ engines support _grouping_ in some way or another. The ones based on the Perl syntax are specially strong in this feature. The engines used in browser support a feature known as _capturing parenthesis_ which allow to describe a pattern inside an expression and return the actual match of that pattern. This is interesting because by abusing this feature we can build a _Finite State Machine_ over the _regular expression_ itself, thus making them much more flexible and powerful while retaining its speed as text scanners.
+Most _regular expression_ engines support _grouping_ in some way or another. The ones based on the Perl syntax are specially strong in this feature. The engines used in browsers support a feature known as _capturing parenthesis_ which allow to describe a pattern inside an expression and return the actual match of that pattern. This is interesting because by abusing this feature we can build a _Finite State Machine_ over the _regular expression_ itself, thus making them much more flexible and powerful while retaining its speed as text scanners.
 
 So lets put an example to clarify this technique. Lets say we want to scan a simple language like the one commonly used in .ini files, where we can have the following lexems: *Ident*, *Value*, *Comment*. This syntax has the following constraints:
   * An Ident is composed of N letters from the english alphabet or an underscore '_'
@@ -20,12 +20,12 @@ So lets put an example to clarify this technique. Lets say we want to scan a sim
 
 Now that we have explained and understood the syntax we can create a regular expression for each one of the _lexems_.
   * *Ident* : `/[A-Za-z_]+/`
-  * *Value* : `/\=*?$/`
+  * *Value* : `/\=.*?$/`
   * *Comment* : `/^#.*?$/`
   
 If we used each one of those regular expressions against the text they would give up the results. So we need to build a system which makes all the checks at the same time and tells us which pattern matched and the actual text it matched. To accomplish this we use _capturing parenthesis_ and the _alternation_ operator '|'.
 
-`/([A-Za-z_]+)|(\=*?$/)|(^#.*?$)/`
+`/([A-Za-z_]+)|(\=.*?$/)|(^#.*?$)/`
 
 if we execute that expression against the text the _regular expressions_ engine will return us an array with the results of the first match it founds. That array will contain the actual text matched in the 0 position. Moreover, since we have used _capturing parenthesis_ it will have allocated the result of each one of them in that array starting at the index 1. 
 
@@ -45,7 +45,7 @@ Applying the expression repeatedly we get the following results:
 
 Notice anything wrong? Right, it didn't match the comment properly, instead it gave us the commented Ident and Value. The reason is because the first pattern that matches is the one used, so the *order of the patterns is meaningful*. To solve this we can re-order the expression patterns and place the Comment one before the Ident one.
 {{{
-/(^#.*?$)|([A-Za-z_]+)|(\=*?$/)/
+/(^#.*?$)|([A-Za-z_]+)|(\=.*?$/)/
 }}}
 
 Now the result is:
