@@ -64,16 +64,16 @@ function BuildLexer( definition, endRe, parent )
     for (var i=0; i < definition.length; i++)
     {
     	rule = {
-    		'name'			: definition[i].name,
-    		're'			: null,
-    		'template'		: null,
-    		'parenthesis'	: definition[i].parenthesis ? definition[i].parenthesis : 0,    		
-    		'parentRule'	: parent ? parent : null,
-    		'childRules'	: null
+    		'n' : definition[i].name,
+    		'r' : null,
+    		't'	: null,
+    		's'	: definition[i].parenthesis ? definition[i].parenthesis : 0,    		
+    		'p'	: parent ? parent : null,
+    		'c'	: null
     	};
     	
     	if (definition[i].endRe)
-    		rule.childRules = BuildLexer( definition[i].rules, definition[i].endRe, rule );
+    		rule.c = BuildLexer( definition[i].rules ? definition[i].rules : [], definition[i].endRe, rule );
        	
        	rules.push( rule );
 		tokensReArr.push( definition[i].re );
@@ -83,9 +83,11 @@ function BuildLexer( definition, endRe, parent )
 		tokensReArr.push( endRe );
 	
 	if (tokensReArr.length)
-	{
-		parent.template = '(' + tokensReArr.join(')|(') + ')';
-		parent.re = new RegExp( parent.template, 'g' );
+	{		
+		if (endRe.search(/(^|[^\\])\\[1-9]+[0-9]*/) != -1)
+			parent.t = '(' + tokensReArr.join(')|(') + ')';
+		else
+			parent.r = new RegExp( '(' + tokensReArr.join(')|(') + ')', 'g' );
 	}
 
 	return rules;
@@ -154,133 +156,6 @@ function XML2Definition( xmldoc )
 
 
 
-// define some commonly used constructs
-// Note: Rules can be defined as a string or as a regexp literal
-
-// match a complex-parsing-variable like ${foo}, {$foo->bar}, ${foo['bar'][2]} ...
-var PHPComplexParsingVariable = new LexerRule( 'Variable', /(?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/, /\}/,
-	[
-		// Operators
-		new LexerRule( 'Operator', /->|[\[\]]/ ),
-		// Keywords
-		new LexerRule( 'Ident', /\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b/ ),		
-		// match single-quoted no-multiline strings supporting \'
-		new LexerRule( 'SingleQuoteString', /'[^'\\]*(?:\\.[^'\\]*)*'/ )
-	]
-);
-
-// match a parsing-variable like $foo or $foo->bar
-var PHPSimpleParsingVariable = new LexerRule( 'Variable', /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/ );
-
-
-//Order matters!
-var Lexer_Definition_PHP = [
-	new LexerRule( 'PHP', /<\?(?:[pP][hH][pP]\b|=|\s|$)/, /\?>/,
-		[				
-			// single-line comments, either // or # style
-			new LexerRule( 'SingleLineComment', /(?:\/\/|#).*$/ ),
-			// multi-line comments
-			new LexerRule( 'MultiLineComment', /\/\*/, /\*\//, [] ),
-			//new LexerContext( 'MultiLineComment', /(\/)(\*)/, /#BACKREFERENCE2##BACKREFERENCE1#/, [] ),
-		
-			// match double-quoted-strings with support for parsing variables
-			new LexerRule( 'DoubleQuoteString', /"/, /"/,
-				[
-					// match \", \$ and the like			
-					new LexerRule( 'Backslash', /\\./ ),
-					PHPComplexParsingVariable,
-					PHPSimpleParsingVariable
-					
-				]
-			),
-			// Heredoc strings
-			new LexerRule( 'HeredocString', /<<<([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$/, /^#BACKREFERENCE1#;?$/, 
-				[
-					// match \$
-					new LexerRule( 'Backslash', /\\\$/ ),
-					PHPComplexParsingVariable,
-					PHPSimpleParsingVariable
-				]
-			),
-			// match single-quoted multiline strings supporting \'
-			new LexerRule( 'SingleQuoteString', /'/, /'/,
-				[
-					// match \'
-					new LexerRule( 'Backslash', /\\'/ )
-				]
-			),
-		
-			// Variables
-			new LexerRule( 'Variable', /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/ ),
-			
-			// Numbers
-			new LexerRule( 'NumberHex', /\b[+-]?0[Xx][0-9A-Fa-f]+\b/ ),
-			new LexerRule( 'NumberFloat', /\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b/ ),
-			new LexerRule( 'NumberOctal', /\b[+-]?0[0-9]+\b/ ),
-			new LexerRule( 'NumberInt', /\b[+-]?[0-9]+\b/ ), 
-		
-			// Operators
-			// TODO: optimize it by placing the single-char operators in a class [\.~<>]
-			// NOTE: for the ? operator we use a 'look-ahead' to ensure that it's not followed by > '\?(?!>)', since it would match the end of PHP block
-			new LexerRule( 'Operator', /~|\|\||\|\=|\||\^\=|\^|@|\?(?!>)|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|<\=|<<\=|<<|<|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&\=|&&|&|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;/ ),	
-				
-			// Keywords
-			new LexerRule( 'Ident', /\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b/ )
-		]
-	)
-];
-
-var Lexer_Definition_HTML = [
-	new LexerRule( 'Tag', /<[A-Za-z_]+[A-Za-z0-9_]*/, />/,
-		[
-			new LexerRule( 'Attribute', /[A-Za-z_]+[A-Za-z0-9_]*/ ),
-			/*new LexerRule( 'Value', /(?<=\=\s*)(?:"[^"]+"|[^\s>]+)/ ),*/
-		]
-	),
-	new LexerRule( 'EndTag', /<\/[A-Za-z_]+[A-Za-z0-9_]*>/ )
-];
-
-
-var Lexer_Definition_JS = [
-	new LexerRule( 'SingleLineComment', /\/\/.*?$/ ),
-	new LexerRule( 'MultiLineComment', /\/\*/, /\*\//, [] ),
-
-	// match single-quoted  strings supporting \' and multiline with ending \
-	new LexerRule( 'SingleQuoteString', /'/, /'|$/,
-		[
-			new LexerRule( 'BackslashMultiline', /\\\s*$/ ),
-			new LexerRule( 'BackslashOctal', /\\[0-7]{1,3}/ ),
-			new LexerRule( 'BackslashHex', /\\x[0-9A-Fa-f]{2}/ ),
-			new LexerRule( 'BackslashUnicode', /u[0-9A-Fa-f]{4}/ ),
-			// match \', \\, \t and the like
-			new LexerRule( 'Backslash', /\\./ )
-			
-		]
-	),	
-	// match double-quoted-strings supporting \" and multiline ending with \
-	new LexerRule( 'DoubleQuoteString', /"/, /"|$/,
-		[
-			new LexerRule( 'BackslashMultiline', /\\\s*$/ ),		
-			new LexerRule( 'BackslashOctal', /\\[0-7]{1,3}/ ),
-			new LexerRule( 'BackslashHex', /\\x[0-9A-Fa-f]{2}/ ),
-			new LexerRule( 'BackslashUnicode', /u[0-9A-Fa-f]{4}/ ),
-			// match \", \\, \t and the like
-			new LexerRule( 'Backslash', /\\./ )		
-		]
-	),
-	
-	// Numbers
-	new LexerRule( 'NumberHex', /\b[+-]?0[Xx][0-9A-Fa-f]+\b/ ),
-	new LexerRule( 'NumberFloat', /\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b/ ),
-	new LexerRule( 'NumberInt', /\b[+-]?[0-9]+\b/ ), 	
-	
-	// Operators
-	new LexerRule( 'Operator', />=|<=|===|==|\+=|-=|\*=|\/=|\!==|\!=|&&|\|\||[\!\{\}\[\]\(\)\=><\?\:\-\+\*\/\.\&\|]/ ),
-	
-	// Idents
-	new LexerRule( 'Ident', /[A-Za-z_\$]+[A-Za-z0-9_\$]*/ )
-];
-	
 	
 
 function addLexem( name, extra, pos, length, txt )
@@ -288,6 +163,16 @@ function addLexem( name, extra, pos, length, txt )
 	console.log('LEXEM "%s" [%s] (%d:%d): "%s"', name, extra, pos, length, txt.substr(pos,length));
 }
 
+/*
+
+	n : name
+    r : regexp
+    t : template
+    s : parenthesis    		
+    p : parent rule
+    c : children rules
+
+*/
 function parseLine( src, rule )
 { 
     var escapeRe = /[\|\[\]\(\)\^\$\.\*\+\?\!\{\}\,\=\\]/g;
@@ -296,65 +181,61 @@ function parseLine( src, rule )
     var idx, tkn;
     
     var match;
-    var dinamic;
-    
-    //console.log( String(token.nextContext.re.toSource) );
-      
+     
 	//reset the regular expression
-    rule.re.lastIndex = 0;
+    rule.r.lastIndex = 0;
     // find next token
-    while ( (match = rule.re.exec( src )) !== null )
-    {
-    	dinamic = false;
-    	
+    while ( (match = rule.r.exec( src )) !== null )
+    {    	
 		// loop thru the captured parenthesis to find the matched token
-        for (idx=1, tkn=0; tkn < rule.childRules.length; idx++, tkn++)
+        for (idx=1, tkn=0; tkn < rule.c.length; idx++, tkn++)
         { 
         	if (match[idx])
         		break;
-        	// make sure we take into account the dinamic rules which use parenthesis too
-        	if (rule.childRules[tkn].parenthesis)
-        		idx += rule.childRules[tkn].parenthesis;
+        	// make sure we take into account the dinamic rules which also use capturing parenthesis
+        	if (rule.c[tkn].s)
+        		idx += rule.c[tkn].s;
         }
         
        	// check if the end of context one was
-       	if (!rule.childRules[tkn])
+       	if (!rule.c[tkn])
        	{
-           	addLexem( rule.name, '>', match.index, match[0].length, src );
-
-           	rule = rule.parentRule;
+           	addLexem( rule.n, '>', match.index, match[0].length, src );
+           	
+           	// move to the parent rules
+           	rule = rule.p;
        	}
        	// The token opens a new context        	
-       	else if (rule.childRules[tkn].childRules) //rule.childRules[tkn].re
+       	else if (rule.c[tkn].c) //rule.c[tkn].r
        	{
-       		addLexem( rule.childRules[tkn].name, '<', match.index, match[0].length, src );
-
-			// we have matched a dinamic context, so we need to rebuild the escape rule
-            if (rule.childRules[tkn].parenthesis)
+			// move to the new rules
+            rule = rule.c[tkn];
+            
+       		addLexem( rule.n, '<', match.index, match[0].length, src );
+           
+			// if we have matched a dinamic context, so we need to rebuild the escape rule
+            if (rule.t)
             {
             	// replace all the back-references place holders with their actual content 
-            	dinamic = rule.childRule[tkn].template;
-                for (i=1; i<=rule.childRule[tkn].parenthesis; i++)
+            	rule.r = rule.t;
+                for (i=rule.s; i>0; i--)
                 {
                 	if (match[idx+i])
-                  		dinamic = dinamic.replace( '#BACKREFERENCE'+i+'#', match[idx+i].replace( escapeRe, '\\$&' ) );
+                  		rule.r = rule.r.replace( '\\'+i, match[idx+i].replace( escapeRe, '\\$&' ) );
 				}
-			}
 
-			// move to the new context
-            rule = rule.childRules[tkn];
-            // if it's dinamic then we rebuild the regular expression
-            if (dinamic)
-				rule.re = new RegExp( dinamic, 'g' );
+				// rebuild the regular expression
+				rule.r = new RegExp( rule.r, 'g' );
+			}
        	}
        	// Simple token
        	else
        	{
-			addLexem( rule.childRules[tkn].name, '', match.index, match[0].length, src );
+			addLexem( rule.c[tkn].n, '', match.index, match[0].length, src );
        	}
 
        	pos = match.index + match[0].length;       
-      	rule.re.lastIndex = pos;
+      	rule.r.lastIndex = pos;
 	}
 		
 	return rule;
@@ -382,309 +263,72 @@ else
 	alert('Your browser can\'t handle this script');
 }
 
-xmlDoc.load( 'php.definition.xml' );
-
+xmlDoc.load( 'xml.definition.xml' );
 
 
 function LexerSerialize( lexer, variable, path )
 {
+	var j;
 	var s = '';
 	
 	if (! path.length)
-		s += variable + ' = ';		
-	s += '{\n';
-	s += '	name		: "' + lexer.name + '",\n';
-	s += '	parenthesis	: ' + ( lexer.parenthesis ? lexer.parenthesis : 0 ) + ',\n';
-	s += '	re			: ' + ( lexer.re ? String(lexer.re) : 'null' ) + ',\n';
-	s += '	template	: "' + ( lexer.template ? lexer.template.replace('"', '\\"') : '' ) + '",\n';
-	s += '	childRules	: []\n';
-	s += '};\n'; 
+		s += 'var ' + variable + '=';
+			
+	s += '{';
+	s += 'n:"' + lexer.n + '"';
+	if (lexer.s)
+		s += ',s:' + lexer.s;
+	if (lexer.r)
+		s += ',r:' + String(lexer.r);
+	// templates are stored as strings so we need to escape some stuff
+	if (lexer.t)
+		s += ',t:"' + lexer.t.replace(/\\[1-9]+[0-9]*/g, '\\$&').replace(/"/g, '\\"') + '"';
+	s += '};'; 
 	
-	//get parent
-	var parent = variable;
-	for (var j=0; j<path.length; j++)
-		parent += '.childRules[' + path[j] + ']';
-	
-	if (lexer.childRules)
-	{
-		for (var j=0; j<lexer.childRules.length; j++)
+	// process the children
+	if (lexer.c)
+	{	
+		// get parent
+		var parent = variable;
+		for (j=0; j<path.length; j++)
+			parent += '.c[' + path[j] + ']';
+		
+		s += parent + '.c=[];';
+		for (j=0; j<lexer.c.length; j++)
 		{
-			s += parent + '.childRules[' + j + '] = '
-			s += LexerSerialize( lexer.childRules[j], variable, path.concat( [j] ) ) + '\r\n';
-			s += parent + '.childRules[' + j + '].parentRule = ' + parent + ';\r\n';
+			s += parent + '.c[' + j + ']='
+			s += LexerSerialize( lexer.c[j], variable, path.concat( [j] ) );
+			s += parent + '.c[' + j + '].p=' + parent + ';';
 		}
 	}
-	
+		
 	return s;
 }
 
 
 
 var phpLexer = { 
-	'name'			: 'text',
-	'parentRule'	: null
+	'n'	: 'text',
+	'p'	: null
 };
-phpLexer.childRules = BuildLexer( Lexer_Definition_PHP, '', phpLexer );
+
 
 //console.log(phpLexer);
-
-pfx = pfx = {
-	name		: "text",
-	parenthesis	: 0,
-	re			: /(<\?(?:[pP][hH][pP]\b|=|\s|$))/g,
-	template	: "(<\?(?:[pP][hH][pP]\b|=|\s|$))",
-	childRules	: []
-};
-pfx.childRules[0] = {
-	name		: "PHP",
-	parenthesis	: 0,
-	re			: /((?:\/\/|#).*$)|(\/\*)|(")|(<<<([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$)|(')|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\b[+-]?0[Xx][0-9A-Fa-f]+\b)|(\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b)|(\b[+-]?0[0-9]+\b)|(\b[+-]?[0-9]+\b)|(~|\|\||\|\=|\||\^\=|\^|@|\?(?!>)|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|<\=|<<\=|<<|<|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&\=|&&|&|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;)|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|(\?>)/g,
-	template	: "((?:\/\/|#).*$)|(\/\*)|(\")|(<<<([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$)|(')|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\b[+-]?0[Xx][0-9A-Fa-f]+\b)|(\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b)|(\b[+-]?0[0-9]+\b)|(\b[+-]?[0-9]+\b)|(~|\|\||\|\=|\||\^\=|\^|@|\?(?!>)|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|<\=|<<\=|<<|<|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&\=|&&|&|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;)|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|(\?>)",
-	childRules	: []
-};
-pfx.childRules[0].childRules[0] = {
-	name		: "SingleLineComment",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[0].parentRule = pfx.childRules[0];
-pfx.childRules[0].childRules[1] = {
-	name		: "MultiLineComment",
-	parenthesis	: 0,
-	re			: /(\*\/)/g,
-	template	: "(\*\/)",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[1].parentRule = pfx.childRules[0];
-pfx.childRules[0].childRules[2] = {
-	name		: "DoubleQuoteString",
-	parenthesis	: 0,
-	re			: /(\\.)|((?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(")/g,
-	template	: "(\\.)|((?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\")",
-	childRules	: []
-};
-pfx.childRules[0].childRules[2].childRules[0] = {
-	name		: "Backslash",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[2].childRules[0].parentRule = pfx.childRules[0].childRules[2];
-pfx.childRules[0].childRules[2].childRules[1] = {
-	name		: "Variable",
-	parenthesis	: 0,
-	re			: /(->|[\[\]])|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|('[^'\\]*(?:\\.[^'\\]*)*')|(\})/g,
-	template	: "(->|[\[\]])|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|('[^'\\]*(?:\\.[^'\\]*)*')|(\})",
-	childRules	: []
-};
-pfx.childRules[0].childRules[2].childRules[1].childRules[0] = {
-	name		: "Operator",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[2].childRules[1].childRules[0].parentRule = pfx.childRules[0].childRules[2].childRules[1];
-pfx.childRules[0].childRules[2].childRules[1].childRules[1] = {
-	name		: "Ident",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[2].childRules[1].childRules[1].parentRule = pfx.childRules[0].childRules[2].childRules[1];
-pfx.childRules[0].childRules[2].childRules[1].childRules[2] = {
-	name		: "SingleQuoteString",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[2].childRules[1].childRules[2].parentRule = pfx.childRules[0].childRules[2].childRules[1];
-
-pfx.childRules[0].childRules[2].childRules[1].parentRule = pfx.childRules[0].childRules[2];
-pfx.childRules[0].childRules[2].childRules[2] = {
-	name		: "Variable",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[2].childRules[2].parentRule = pfx.childRules[0].childRules[2];
-
-pfx.childRules[0].childRules[2].parentRule = pfx.childRules[0];
-pfx.childRules[0].childRules[3] = {
-	name		: "HeredocString",
-	parenthesis	: 1,
-	re			: /(\\\$)|((?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(^#BACKREFERENCE1#;?$)/g,
-	template	: "(\\\$)|((?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(^#BACKREFERENCE1#;?$)",
-	childRules	: []
-};
-pfx.childRules[0].childRules[3].childRules[0] = {
-	name		: "Backslash",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[3].childRules[0].parentRule = pfx.childRules[0].childRules[3];
-pfx.childRules[0].childRules[3].childRules[1] = {
-	name		: "Variable",
-	parenthesis	: 0,
-	re			: /(->|[\[\]])|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|('[^'\\]*(?:\\.[^'\\]*)*')|(\})/g,
-	template	: "(->|[\[\]])|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|('[^'\\]*(?:\\.[^'\\]*)*')|(\})",
-	childRules	: []
-};
-pfx.childRules[0].childRules[3].childRules[1].childRules[0] = {
-	name		: "Operator",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[3].childRules[1].childRules[0].parentRule = pfx.childRules[0].childRules[3].childRules[1];
-pfx.childRules[0].childRules[3].childRules[1].childRules[1] = {
-	name		: "Ident",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[3].childRules[1].childRules[1].parentRule = pfx.childRules[0].childRules[3].childRules[1];
-pfx.childRules[0].childRules[3].childRules[1].childRules[2] = {
-	name		: "SingleQuoteString",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[3].childRules[1].childRules[2].parentRule = pfx.childRules[0].childRules[3].childRules[1];
-
-pfx.childRules[0].childRules[3].childRules[1].parentRule = pfx.childRules[0].childRules[3];
-pfx.childRules[0].childRules[3].childRules[2] = {
-	name		: "Variable",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[3].childRules[2].parentRule = pfx.childRules[0].childRules[3];
-
-pfx.childRules[0].childRules[3].parentRule = pfx.childRules[0];
-pfx.childRules[0].childRules[4] = {
-	name		: "SingleQuoteString",
-	parenthesis	: 0,
-	re			: /(\\')|(')/g,
-	template	: "(\\')|(')",
-	childRules	: []
-};
-pfx.childRules[0].childRules[4].childRules[0] = {
-	name		: "Backslash",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[4].childRules[0].parentRule = pfx.childRules[0].childRules[4];
-
-pfx.childRules[0].childRules[4].parentRule = pfx.childRules[0];
-pfx.childRules[0].childRules[5] = {
-	name		: "Variable",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[5].parentRule = pfx.childRules[0];
-pfx.childRules[0].childRules[6] = {
-	name		: "NumberHex",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[6].parentRule = pfx.childRules[0];
-pfx.childRules[0].childRules[7] = {
-	name		: "NumberFloat",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[7].parentRule = pfx.childRules[0];
-pfx.childRules[0].childRules[8] = {
-	name		: "NumberOctal",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[8].parentRule = pfx.childRules[0];
-pfx.childRules[0].childRules[9] = {
-	name		: "NumberInt",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[9].parentRule = pfx.childRules[0];
-pfx.childRules[0].childRules[10] = {
-	name		: "Operator",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[10].parentRule = pfx.childRules[0];
-pfx.childRules[0].childRules[11] = {
-	name		: "Ident",
-	parenthesis	: 0,
-	re			: null,
-	template	: "",
-	childRules	: []
-};
-
-pfx.childRules[0].childRules[11].parentRule = pfx.childRules[0];
-
-pfx.childRules[0].parentRule = pfx;
-
-phpLexer = pfx;
+var p={n:"text",r:/(<\?(?:[pP][hH][pP]\b|=|\s|$))/g};p.c=[];p.c[0]={n:"PHP",r:/((?:\/\/|#).*$)|((\/)(\*))|(")|(<<<([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$)|(')|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\b[+-]?0[Xx][0-9A-Fa-f]+\b)|(\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b)|(\b[+-]?0[0-9]+\b)|(\b[+-]?[0-9]+\b)|(~|\|\||\|\=|\||\^\=|\^|@|\?(?!>)|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|<\=|<<\=|<<|<|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&\=|&&|&|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;)|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|(\?>)/g};p.c[0].c=[];p.c[0].c[0]={n:"SingleLineComment"};p.c[0].c[0].p=p.c[0];p.c[0].c[1]={n:"MultiLineComment",s:2,t:"(\\2\\1)"};p.c[0].c[1].c=[];p.c[0].c[1].p=p.c[0];p.c[0].c[2]={n:"DoubleQuoteString",r:/(\\.)|((?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(")/g};p.c[0].c[2].c=[];p.c[0].c[2].c[0]={n:"Backslash"};p.c[0].c[2].c[0].p=p.c[0].c[2];p.c[0].c[2].c[1]={n:"Variable",r:/(->|[\[\]])|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|('[^'\\]*(?:\\.[^'\\]*)*')|(\})/g};p.c[0].c[2].c[1].c=[];p.c[0].c[2].c[1].c[0]={n:"Operator"};p.c[0].c[2].c[1].c[0].p=p.c[0].c[2].c[1];p.c[0].c[2].c[1].c[1]={n:"Ident"};p.c[0].c[2].c[1].c[1].p=p.c[0].c[2].c[1];p.c[0].c[2].c[1].c[2]={n:"SingleQuoteString"};p.c[0].c[2].c[1].c[2].p=p.c[0].c[2].c[1];p.c[0].c[2].c[1].p=p.c[0].c[2];p.c[0].c[2].c[2]={n:"Variable"};p.c[0].c[2].c[2].p=p.c[0].c[2];p.c[0].c[2].p=p.c[0];p.c[0].c[3]={n:"HeredocString",s:1,t:"(\\\$)|((?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(^\\1;?$)"};p.c[0].c[3].c=[];p.c[0].c[3].c[0]={n:"Backslash"};p.c[0].c[3].c[0].p=p.c[0].c[3];p.c[0].c[3].c[1]={n:"Variable",r:/(->|[\[\]])|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|('[^'\\]*(?:\\.[^'\\]*)*')|(\})/g};p.c[0].c[3].c[1].c=[];p.c[0].c[3].c[1].c[0]={n:"Operator"};p.c[0].c[3].c[1].c[0].p=p.c[0].c[3].c[1];p.c[0].c[3].c[1].c[1]={n:"Ident"};p.c[0].c[3].c[1].c[1].p=p.c[0].c[3].c[1];p.c[0].c[3].c[1].c[2]={n:"SingleQuoteString"};p.c[0].c[3].c[1].c[2].p=p.c[0].c[3].c[1];p.c[0].c[3].c[1].p=p.c[0].c[3];p.c[0].c[3].c[2]={n:"Variable"};p.c[0].c[3].c[2].p=p.c[0].c[3];p.c[0].c[3].p=p.c[0];p.c[0].c[4]={n:"SingleQuoteString",r:/(\\')|(')/g};p.c[0].c[4].c=[];p.c[0].c[4].c[0]={n:"Backslash"};p.c[0].c[4].c[0].p=p.c[0].c[4];p.c[0].c[4].p=p.c[0];p.c[0].c[5]={n:"Variable"};p.c[0].c[5].p=p.c[0];p.c[0].c[6]={n:"NumberHex"};p.c[0].c[6].p=p.c[0];p.c[0].c[7]={n:"NumberFloat"};p.c[0].c[7].p=p.c[0];p.c[0].c[8]={n:"NumberOctal"};p.c[0].c[8].p=p.c[0];p.c[0].c[9]={n:"NumberInt"};p.c[0].c[9].p=p.c[0];p.c[0].c[10]={n:"Operator"};p.c[0].c[10].p=p.c[0];p.c[0].c[11]={n:"Ident"};p.c[0].c[11].p=p.c[0];p.c[0].p=p;
+phpLexer = p;
 
 //parseLine('/* comment  */ $var = new myClass(\'one\');', phpLexer);
 
 function doIt()
 {
-	//document.getElementById( 'txt' ).value = LexerSerialize( phpLexer, 'pfx', [] );
-
 	console.log('XML');
 	console.log( xmlDef );
+	phpLexer.c = BuildLexer( xmlDef, '', phpLexer );
 
+	document.getElementById( 'txt' ).value = LexerSerialize( phpLexer, 'p', [] );
 
-//phpLexer.childRules = BuildLexer( xmlDef, '', phpLexer );
-
-parseLine('<?PHP /* comment  */ ?> $var = new myClass(\'one\');', phpLexer);
+//parseLine('<?PHP /* comment  */ $var = new myClass("o\\"n\'e");', phpLexer);
+parseLine('<ns:tag attr="value" attr2=value2>hello world</ns:tag>', phpLexer);
 return;
 
 
@@ -973,6 +617,6 @@ function javaScriptBenchmark( what, reportHandle )
 <body>
 <a href="javascript:javaScriptBenchmark('doIt()', document.getElementById('out'))">doIt</a>
 <div id="out"></div>
-<textarea id="txt"></textarea>
+<textarea id="txt" rows="100" cols="100"></textarea>
 </body>
 </html>
