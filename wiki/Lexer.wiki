@@ -21,13 +21,13 @@ So lets put an example to clarify this technique. Lets say we want to scan a sim
   * Comments are prefixed by the # character at the beginning of the line
 
 Now that we have explained and understood the syntax we can create a regular expression for each one of the lexems.
-  * *Ident* : /[A-Za-z_]+/
-  * *Value* : /\=*?$/
-  * *Comment* : /^#.*?$/
+  * *Ident* : `/[A-Za-z_]+/`
+  * *Value* : `/\=*?$/`
+  * *Comment* : `/^#.*?$/`
   
 If we used each one of those regular expressions against the text they would give up the results. So we need to build a system which makes all the checks at the same time and tells us which pattern matched and the actual text it matched. To accomplish this we use _capturing parenthesis_ and the _alternation_ operator '|'.
 
-/|([A-Za-z_]+)|(\=*?$/)|(^#.*?$)/
+`/([A-Za-z_]+)|(\=*?$/)|(^#.*?$)/`
 
 if we execute that expression against the text the _regular expressions_ engine will return us an array with the results of the first match it founds. That array will contain the actual text matched in the 0 position. Moreover, since we have used _capturing parenthesis_ it will have allocated the result of each one of them in that array starting at the index 1. 
 
@@ -38,15 +38,52 @@ foo = bar
 }}}
 
 Applying the expression repeatedly we get the following results:
+|| *0*    || *1*    || *2*   || *3*   ||
+|| foo    || foo    ||       ||       ||
+|| = bar  ||        || = bar ||       ||
+|| x      || x      ||       ||       ||
+|| = y    ||        || = y   ||       ||
+
+
+Notice anything wrong? Right, it didn't match the comment properly, instead it gave us the commented Ident and Value. The reason is because the first pattern that matches is the one used, so the *order of the patterns is meaningful*. To solve this we can re-order the expression patterns and place the Comment one before the Ident one.
 {{{
-[    0    ,   1    ,    2    ,   3   ]
-[ 'foo'   , 'foo'  ,   NULL  , NULL  ]
-[ '= bar' ,  NULL  , '= bar' , NULL  ]
-[ 'x'     , '= y'  ,   NULL  , NULL  ]
-[ '= y'   ,  NULL  , '= y'   , NULL  ]
+/(^#.*?$)|([A-Za-z_]+)|(\=*?$/)/
 }}}
 
-Notice anything wrong? Right, it didn't match the comment properly, instead it gave us the commented Ident and Value
+Now the result is:
+|| *0*    || *1*    || *2*   || *3*   ||
+|| foo    || foo    ||       ||       ||
+|| = bar  ||        || = bar ||       ||
+|| #x = y ||        ||       || #x = y||
+
+For each match (row in the above table) we can associate it with a _lexem_. Take a look at the following code to see how it works.
+{{{
+// define the text to match against
+src = 'foo = bar\n\
+#x = y';
+
+// define the regular expression being used (multi-line and global modifiers)
+re = /(^#.*?$)|([A-Za-z_]+)|(\=*?$/)/gm;
+
+// define the lexems identifiers in the order their patterns are used
+lexems = [ 'comment', 'ident', 'value' ];
+
+// find all the matches
+while ( match = re.exec(src) )
+{
+  // loop thru the defined patterns...
+  for (i=0; i<lexems.length; i++)
+  {
+    //...to find the one which actually matched (the match array is 1 based)
+    if (match[ 1+i ].length)
+    {
+      alert('Lexem "' + lexems[i] + '" found with text "' + match[ 1+i ] + '"');
+    }
+  }
+}
+}}}
+
+
 
 = Details =
 
@@ -54,3 +91,5 @@ Add your content here.  Format your content with:
   * Text in *bold* or _italic_
   * Headings, paragraphs, and lists
   * Automatic links to other wiki pages
+
+
