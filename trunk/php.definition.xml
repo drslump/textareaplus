@@ -2,6 +2,7 @@
 <definition lang="PHP">
 
 	<templates>
+		<!-- match a complex-parsing-variable like ${foo}, {$foo->bar}, ${foo['bar'][2]} ... -->
 		<template id="PHPComplexParsingVariable">
 			<rule name="Variable" start="(?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" end="\}">
 				<rule name="Operator" start="-&gt;|[\[\]]" />
@@ -9,39 +10,53 @@
 				<rule name="SingleQuoteString" start="'[^'\\]*(?:\\.[^'\\]*)*'" />	
 			</rule>
 		</template>
+		<!-- match a parsing-variable like $foo or $foo->bar -->
 		<template id="PHPSimpleParsingVariable">
 			<rule name="Variable" start="\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" />
 		</template>	
 	</templates>
-		
+	
+	<!-- Order of the rules matters -->	
 	<rules>
-		<rule name="PHP" start="&lt;\?(?:[pP][hH][pP]\b|=|\s|$)" end="\?&gt;">		
+		<rule name="PHP" start="&lt;\?(?:[pP][hH][pP]\b|=|\s|$)" end="\?&gt;">	
+			<!-- single-line comments, either // or # style	 -->
 			<rule name="SingleLineComment" start="(?:\/\/|#).*$" />
+			<!-- multi-line comments -->
 			<rule name="MultiLineComment" start="\/\*" end="\*\/" />
-		
+			
+			<!-- match double-quoted-strings with support for parsing variables -->
 			<rule name="DoubleQuoteString" start="&quot;" end="&quot;">
 				<rule name="Backslash" start="\\." />
 				<template ref="PHPComplexParsingVariable" />
 				<template ref="PHPSimpleParsingVariable" />
-			</rule>			
+			</rule>		
+			<!-- Heredoc strings -->
 			<rule name="HeredocString" start="&lt;&lt;&lt;([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$" end="^#BACKREFERENCE1#;?$">
 				<rule name="Backslash" start="\\\$" />
 				<template ref="PHPComplexParsingVariable" />
 				<template ref="PHPSimpleParsingVariable" />
 			</rule>
+			<!-- match single-quoted multiline strings supporting \' -->
 			<rule name="SingleQuoteString" start="'" end="'">
 				<rule name="Backslash" start="\\'" />
 			</rule>
-	
+			
+			<!-- Variables -->
 			<rule name="Variable" start="\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" />
-		
+			
+			<!-- Numbers -->
 			<rule name="NumberHex" start="\b[+-]?0[Xx][0-9A-Fa-f]+\b" />
 			<rule name="NumberFloat" start="\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b" />
 			<rule name="NumberOctal" start="\b[+-]?0[0-9]+\b" />
 			<rule name="NumberInt" start="\b[+-]?[0-9]+\b" />
 	
+			<!-- Operators
+				TODO: optimize it by placing the single-char operators in a class [\.~=+]
+				NOTE: for the ? operator we use a 'look-ahead' to ensure that it's not followed by > '\?(?!>)', since it would conflict with the end of PHP block
+			-->
 			<rule name="Operator" start="~|\|\||\|\=|\||\^\=|\^|@|\?(?!&gt;)|&gt;&gt;\=|&gt;&gt;|&gt;\=|&gt;|\=\=\=|\=\=|\=|&lt;\=|&lt;&lt;\=|&lt;&lt;|&lt;|::|:|\/\=|\/|\.\=|\.|-&gt;|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&amp;\=|&amp;&amp;|&amp;|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;" />
 			
+			<!-- Idents -->
 			<rule name="Ident" start="\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b" />		
 		</rule>
 	</rules>
