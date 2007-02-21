@@ -9,16 +9,16 @@ A lexer is theoretically composed of two parts: a scanner and a evaluator. Howev
 
 Due to the interpreted nature of Javascript and given that the lexer must be as fast as possible to be used in real time (interactively) we couldn't base it on traditional designs, which take a char at a time and see if it matches certain rules, implementing in fact a _Finite State Machine_. Instead we take advantage of _Regular Expression_ which are a native Javascript object thus very fast compared to interpreted scanning algorithms.
 
-A _Regular Expression_ is a sequence of characters, control codes and mathematical operators which allow to describe a set of strings. The _regular expression_ once interpreted by its engine is transformed into a _Finite State Machine_, with most modern engines (Perl compatible) allowing to do _backtracking_, allowing to describe pretty complex string constructs easily. We have explained above that a lexer scanner is typically implemented as a _Finite State Machine_, so we can handle a _regular expression_ in a specific way to take advantage of that. Given that they are translated into machine code (compiled) they are the faster alternative for this job while at the same time are flexible enough for most cases.
+A _Regular Expression_ is a sequence of characters, control codes and mathematical operators which allow to describe a set of strings. The _regular expression_ once interpreted by its engine is transformed into a _Finite State Machine_, with most modern engines (Perl compatible) able to do _backtracking_, allowing to describe pretty complex string constructs easily. We have explained above that a lexer scanner is typically implemented as a _Finite State Machine_, so we can handle a _regular expression_ in a specific way to take advantage of that. Given that they are translated into machine code (compiled) they are the faster alternative for this job while at the same time are flexible enough for most cases.
 
 = How it works =
 
 Most _regular expression_ engines support _grouping_ in some way or another. The ones based on the Perl syntax are specially strong in this feature. The engines used in browsers support a feature known as _capturing parenthesis_ which allow to describe a pattern inside an expression and return the actual match of that pattern. This is interesting because by abusing this feature we can build a _Finite State Machine_ over the _regular expression_ itself, thus making them much more flexible and powerful while retaining its speed as text scanners.
 
 So lets put an example to clarify this technique. Lets say we want to scan a simple language like the one commonly used in .ini files, where we can have the following lexems: *Ident*, *Value*, *Comment*. This syntax has the following constraints:
-  * An Ident is composed of N letters from the english alphabet or an underscore '_'
-  * Values are everything from the equal sign until the end of the line
-  * Comments are prefixed by the # character at the beginning of the line
+  * An _Ident_ is composed of N letters from the english alphabet or an underscore '`_`'
+  * _Values_ are everything from the equal sign until the end of the line
+  * _Comments_ are prefixed by the `#` character at the beginning of the line
 
 Now that we have explained and understood the syntax we can create a regular expression for each one of the _lexems_.
   * *Ident* : `/[A-Za-z_]+/`
