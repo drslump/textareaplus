@@ -20,9 +20,9 @@
 	<rules>
 		<rule name="PHP" start="&lt;\?(?:[pP][hH][pP]\b|=|\s|$)" end="\?&gt;">	
 			<!-- single-line comments, either // or # style	 -->
-			<rule name="SingleLineComment" start="(?:\/\/|#).*$" />
+			<rule name="Comment" start="(?:\/\/|#).*$" />
 			<!-- multi-line comments -->
-			<rule name="MultiLineComment" start="\/\*" end="\*\/" />
+			<rule name="Comment" start="\/\*" end="\*\/" />
 			
 			<!-- match double-quoted-strings with support for parsing variables -->
 			<rule name="DoubleQuoteString" start="&quot;" end="&quot;">
@@ -45,10 +45,10 @@
 			<rule name="Variable" start="\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" />
 			
 			<!-- Numbers -->
-			<rule name="NumberHex" start="\b[+-]?0[Xx][0-9A-Fa-f]+\b" />
-			<rule name="NumberFloat" start="\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b" />
-			<rule name="NumberOctal" start="\b[+-]?0[0-9]+\b" />
-			<rule name="NumberInt" start="\b[+-]?[0-9]+\b" />
+			<rule name="Number" start="\b[+-]?0[Xx][0-9A-Fa-f]+\b" />
+			<rule name="Number" start="\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b" />
+			<rule name="Number" start="\b[+-]?0[0-9]+\b" />
+			<rule name="Number" start="\b[+-]?[0-9]+\b" />
 	
 			<!-- Operators
 				TODO: optimize it by placing the single-char operators in a class [\.~=+]
