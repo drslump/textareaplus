@@ -1,0 +1,292 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Insert title here</title>
+<script language="javascript" type="text/javascript" src="firebug/firebug.js"></script>
+
+<script language="javascript" src="textAreaPlus/Lexer.js"></script>
+
+<script language="javascript">
+/*
+
+	Another JS lexer: SourceMap http://www.devpro.it/code/126.html
+	PHP version: http://www.phpclasses.org/browse/package/3279.html
+	
+	OverByte Editor (former byteplug), uses SourceMap: http://webreflection.blogspot.com
+	
+	EditArea: http://cdolivet.net/index.php?page=editArea
+	
+	Workspace, web based IDE: http://www.createworkspace.com/
+
+*/
+
+function TAP_Buffer( /** Object */ lexer, /** String */ src )
+{
+	this.lexer = lexer ? lexer : null;
+	this.lines = [];
+		
+	if (src)
+		this.read( src );
+}
+
+TAP_Buffer.prototype.read = function( /** String */ src )
+{
+	this.clear();
+
+	var line;
+	var lastLexer = this.lexer;
+	var srcLines = src.split(/\r\n|\r|\n/);
+	for (var i=0; i<srcLines.length; i++)
+	{
+		line = new TAP_Buffer_Line( srcLines[i], lastLexer );
+		if (line.lexer)
+		{
+			lastLexer = line.scan();
+		}
+		this.lines.push( line );
+	}
+}
+
+TAP_Buffer.prototype.clear = function()
+{
+	this.lines = [];
+}
+
+
+function TAP_Buffer_Line( /** String */ src, /** Object */ lexer )
+{
+	this.src = src;
+	this.lexer = lexer;
+	this.lexems = [];
+	this.currentLexem = -1;
+}
+
+TAP_Buffer_Line.prototype.scan = function ( )
+{
+	//NOT WORKING: The callback function is called statically, 'this' points to the Window object
+	//possible work around is to pass the object directly
+	return TAP_Lexer_Scan( this.lexer, this.src, this.addLexem );
+}
+
+TAP_Buffer_Line.prototype.addLexem = function ( name, extra, pos, length, TXT)
+{
+	console.log(this);
+	console.log('LEXEM "%s" FOUND AT %d : <%s>', name, pos, this.src.substr(pos, length)); 
+}
+
+TAP_Buffer_Line.prototype.nextLexem = function ()
+{
+	if (this.currentLexem+1 >= this.lexems.length)
+		return null;
+	return this.lexems[ ++this.currentLexem ];
+}
+
+TAP_Buffer_Line.prototype.prevLexem = function ()
+{
+	if (this.currentLexem-1 < 0)
+		return null;
+	return this.lexems[ --this.currentLexem ];
+}
+
+
+
+function TAP_Buffer_Lexem( /** Number */ pos, /** Number */ length )
+{
+	this.pos = pos;
+	this.length = length;
+}
+
+
+
+
+// lexer scanner callback
+function addLexem( name, extra, pos, length, txt )
+{
+	//console.log('LEXEM "%s" [%s] (%d:%d): "%s"', name, extra, pos, length, txt.substr(pos,length));
+	if (name == 'Ident')
+	{
+		if (/^(include_once|class|extends|var)$/.test( txt.substr(pos,length) ))
+		{
+			name = 'Keyword';
+		}
+	}
+	
+	lexems.push( { 'name': name, 'extra': extra, 'pos': pos, 'length': length } );
+}
+
+var lexems = [];
+
+function doIt( id )
+{
+	var php={n:"text",r:/(<\?(?:[pP][hH][pP]\b|=|\s|$))/gm};php.c=[];php.c[0]={n:"PHP",r:/((?:\/\/|#).*$)|(\/\*)|(")|(<<<([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$)|(')|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\b[+-]?0[Xx][0-9A-Fa-f]+\b)|(\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b)|(\b[+-]?0[0-9]+\b)|(\b[+-]?[0-9]+\b)|(~|\|\||\|\=|\||\^\=|\^|@|\?(?!>)|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|<\=|<<\=|<<|<|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&\=|&&|&|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;)|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|(\?>)/gm};php.c[0].c=[];php.c[0].c[0]={n:"Comment"};php.c[0].c[0].p=php.c[0];php.c[0].c[1]={n:"Comment",r:/(\*\/)/gm};php.c[0].c[1].c=[];php.c[0].c[1].p=php.c[0];php.c[0].c[2]={n:"DoubleQuoteString",r:/(\\.)|((?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(")/gm};php.c[0].c[2].c=[];php.c[0].c[2].c[0]={n:"Backslash"};php.c[0].c[2].c[0].p=php.c[0].c[2];php.c[0].c[2].c[1]={n:"Variable",r:/(->|[\[\]])|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|('[^'\\]*(?:\\.[^'\\]*)*')|(\})/gm};php.c[0].c[2].c[1].c=[];php.c[0].c[2].c[1].c[0]={n:"Operator"};php.c[0].c[2].c[1].c[0].p=php.c[0].c[2].c[1];php.c[0].c[2].c[1].c[1]={n:"Ident"};php.c[0].c[2].c[1].c[1].p=php.c[0].c[2].c[1];php.c[0].c[2].c[1].c[2]={n:"SingleQuoteString"};php.c[0].c[2].c[1].c[2].p=php.c[0].c[2].c[1];php.c[0].c[2].c[1].p=php.c[0].c[2];php.c[0].c[2].c[2]={n:"Variable"};php.c[0].c[2].c[2].p=php.c[0].c[2];php.c[0].c[2].p=php.c[0];php.c[0].c[3]={n:"HeredocString",s:1,t:"(\\\$)|((?:\$\{|\{\$)[a-zA-Z_\\x7f-\\xff][a-zA-Z0-9_\\x7f-\\xff]*)|(\$[a-zA-Z_\\x7f-\\xff][a-zA-Z0-9_\\x7f-\\xff]*)|(^#BACKREF1#;?$)"};php.c[0].c[3].c=[];php.c[0].c[3].c[0]={n:"Backslash"};php.c[0].c[3].c[0].p=php.c[0].c[3];php.c[0].c[3].c[1]={n:"Variable",r:/(->|[\[\]])|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|('[^'\\]*(?:\\.[^'\\]*)*')|(\})/gm};php.c[0].c[3].c[1].c=[];php.c[0].c[3].c[1].c[0]={n:"Operator"};php.c[0].c[3].c[1].c[0].p=php.c[0].c[3].c[1];php.c[0].c[3].c[1].c[1]={n:"Ident"};php.c[0].c[3].c[1].c[1].p=php.c[0].c[3].c[1];php.c[0].c[3].c[1].c[2]={n:"SingleQuoteString"};php.c[0].c[3].c[1].c[2].p=php.c[0].c[3].c[1];php.c[0].c[3].c[1].p=php.c[0].c[3];php.c[0].c[3].c[2]={n:"Variable"};php.c[0].c[3].c[2].p=php.c[0].c[3];php.c[0].c[3].p=php.c[0];php.c[0].c[4]={n:"SingleQuoteString",r:/(\\')|(')/gm};php.c[0].c[4].c=[];php.c[0].c[4].c[0]={n:"Backslash"};php.c[0].c[4].c[0].p=php.c[0].c[4];php.c[0].c[4].p=php.c[0];php.c[0].c[5]={n:"Variable"};php.c[0].c[5].p=php.c[0];php.c[0].c[6]={n:"Number"};php.c[0].c[6].p=php.c[0];php.c[0].c[7]={n:"Number"};php.c[0].c[7].p=php.c[0];php.c[0].c[8]={n:"Number"};php.c[0].c[8].p=php.c[0];php.c[0].c[9]={n:"Number"};php.c[0].c[9].p=php.c[0];php.c[0].c[10]={n:"Operator"};php.c[0].c[10].p=php.c[0];php.c[0].c[11]={n:"Ident"};php.c[0].c[11].p=php.c[0];php.c[0].p=php;
+	lexer = php;
+	
+	var src = document.getElementById( id ).value;
+	
+	
+	var buffer = new TAP_Buffer( php, src );
+	return;
+
+	var ul = document.getElementById('UL');
+	var nested = {};
+	var classes = '';
+	
+
+	
+	var r = lexer;
+	var txtLines = src.split(/\r\n|\r|\n/);
+	for (var i=0; i<txtLines.length; i++)
+	{
+		lexems = [];
+		r = TAP_Lexer_Scan( r, txtLines[i], addLexem );
+		
+		var li = document.createElement('LI');
+		var lastPos = 0;
+				
+		for (var j=0; j<lexems.length; j++)
+		{
+			if (lastPos < lexems[j].pos)
+			{
+				var span = document.createElement('SPAN');
+				span.appendChild( document.createTextNode( txtLines[i].substring( lastPos, lexems[j].pos ) ) );
+				span.className = classes + 'text';
+				li.appendChild( span );
+			}
+			lastPos = lexems[j].pos + lexems[j].length;
+			
+			var span = document.createElement('SPAN');
+			
+			if (! nested[lexems[j].name]) nested[lexems[j].name] = 0;
+			if (lexems[j].extra == '<')
+			{
+				span.className = classes + lexems[j].name + '_start';
+				nested[ lexems[j].name ]++
+			}
+			else if (lexems[j].extra == '>')
+			{
+				span.className = classes + lexems[j].name + '_end';
+				nested[ lexems[j].name ]--	
+			}	
+			else
+			{
+				span.className = classes + lexems[j].name;
+			}
+					
+			span.appendChild( document.createTextNode( txtLines[i].substr( lexems[j].pos, lexems[j].length ) ) );
+			li.appendChild( span );
+			
+			var classes = '';
+			for (var k in nested)
+			{
+				if (nested[k])
+					classes += k + ' ';
+			}
+		}
+		
+		if (lastPos < txtLines[i].length)
+		{
+			var span = document.createElement('SPAN');
+			span.className = classes + 'text';
+			span.appendChild( document.createTextNode( txtLines[i].substring( lastPos ) ) );
+			li.appendChild( span );
+		}
+
+		ul.appendChild( li );
+	}
+}
+
+
+
+function initializeJavaScriptBenchmark( what )
+{
+	if( !document.timeStamps )
+		document.timeStamps = []
+	if( !document.timeStamps[ what ] )
+		document.timeStamps[ what ] = [ 0, 0, 0, 0 ]
+	document.timeStamps[ what ][ 0 ] -= (new Date()).valueOf()+0*(document.timeStamps[ what ][ 3 ]=1)
+}
+function updateJavaScriptBenchmark( what )
+{
+	return ( !document.timeStamps || !document.timeStamps[ what ]  || !document.timeStamps[ what ][3] )?-1:document.timeStamps[ what ][ 2 ] = Math.round( 100*(document.timeStamps[ what ][ 0 ] += (new Date()).valueOf() ) / ++document.timeStamps[ what ][ 1 ] )/100+(document.timeStamps[ what ][ 3 ]=0)
+}
+function javaScriptBenchmark( what, reportHandle )
+{
+	initializeJavaScriptBenchmark( what.toString() )
+	typeof(what)=='function'?what():eval( what )
+	updateJavaScriptBenchmark( what.toString() )
+
+	var report = ""
+	for( currentWhat in document.timeStamps )
+	report += document.timeStamps[ currentWhat ][ 1 ]?currentWhat +"\n________________________________________\ntook in average ~"+ document.timeStamps[ currentWhat ][ 2 ] +"ms after "+ document.timeStamps[ currentWhat ][ 1 ] +" execution(s)\n\n\n":""
+	!reportHandle?alert( report ):reportHandle.innerHTML = report.replace( /\n________________________________________\n/g, "<hr/>" ).replace( /\t/g, "&nbsp; &nbsp; &nbsp;" ).replace( /\n/g, "<br/>" )
+}
+</script>
+
+<style type="text/css">
+.source textarea {
+	display: none;
+}
+
+#UL {
+	list-style:none;
+	margin: 0;
+	padding: 0;
+	font-family: courier new;
+	white-space: pre;
+}
+
+.PHP_start, .PHP_end {
+	color: red;
+	font-weight: bold;
+}
+.Comment_start, .Comment_end, .Comment {
+	color: gray;
+}
+.DoubleQuoteString_start, .DoubleQuoteString_end, .DoubleQuoteString,
+.SingleQuoteString_start, .SingleQuoteString_end, .SingleQuoteString,
+.HeredocString_start, .SingleQuoteString_end, .SingleQuoteString {
+	color: green;
+}
+.Variable {
+	color: blue;
+}
+.Number {
+	color: red;
+}
+.Ident {
+	color: black;
+}
+.Keyword {
+	color: magenta;
+}
+</style>
+</head>
+<body>
+
+
+<div class="source">
+	<a href="javascript:javaScriptBenchmark('doIt(\'php\')', document.getElementById('out'))">PHP</a>
+	<textarea id="php">
+&lt;?php
+include_once 'FLV/FLV.php';
+
+class MyFLV extends FLV {
+	
+	/**
+	 * On audio-only files the frame index will use this as minimum gap 
+	 */
+	var $test = 'FLV Tools for PHP v0.1 by DrSlump';
+}
+?&gt;
+	</textarea>
+</div>
+
+<div id="out"></div>
+
+<ul id="UL">
+</ul>
+
+
+</body>
+</html>
