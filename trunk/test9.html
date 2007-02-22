@@ -60,19 +60,20 @@ function TAP_Buffer_Line( /** String */ src, /** Object */ lexer )
 	this.lexer = lexer;
 	this.lexems = [];
 	this.currentLexem = -1;
+	
+	// Since we are using it as a callback function we need to use a closure instead of 
+	// extending the object prototype
+	var $this = this;
+	this.addLexem = function ( name, extra, pos, length, TXT) 
+	{
+		//console.log($this);
+		console.log('LEXEM "%s" FOUND AT %d : <%s>', name, pos, $this.src.substr(pos, length)); 
+	}
 }
 
 TAP_Buffer_Line.prototype.scan = function ( )
 {
-	//NOT WORKING: The callback function is called statically, 'this' points to the Window object
-	//possible work around is to pass the object directly
 	return TAP_Lexer_Scan( this.lexer, this.src, this.addLexem );
-}
-
-TAP_Buffer_Line.prototype.addLexem = function ( name, extra, pos, length, TXT)
-{
-	console.log(this);
-	console.log('LEXEM "%s" FOUND AT %d : <%s>', name, pos, this.src.substr(pos, length)); 
 }
 
 TAP_Buffer_Line.prototype.nextLexem = function ()
