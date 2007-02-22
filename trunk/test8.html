@@ -28,7 +28,7 @@ function addLexem( name, extra, pos, length, txt )
 {
 	//console.log('LEXEM "%s" [%s] (%d:%d): "%s"', name, extra, pos, length, txt.substr(pos,length));
 	
-	lexems.push( { 'name': name, 'extra': extra, 'pos': pos, 'length': length } ); 
+	lexems.push( { 'name': name, 'extra': extra, 'pos': pos, 'length': length } );
 }
 
 
@@ -63,13 +63,14 @@ function doIt( id )
 	var lexer = { 
 		'n'	: 'text',
 		'p'	: null
-	};	
+	};
 	lexer.c = TAP_Lexer_Build( xmlDef, '', lexer );
 	
-	document.getElementById( 'txt' ).value = TAP_Lexer_Serialize( lexer, 'p', [] );
+	document.getElementById( 'txt' ).value = TAP_Lexer_Serialize( lexer, 'php', [] );
 
 	var ul = document.getElementById('UL');
 	var nested = {};
+	var classes = '';
 	
 	var src = document.getElementById( id ).value;
 	
@@ -82,45 +83,55 @@ function doIt( id )
 		
 		var li = document.createElement('LI');
 		var lastPos = 0;
-		
-		var classes = '';
-		for (var j in nested)
-		{
-			if (nested[j])
-				classes += j + ' ';
-		}
-		
+				
 		for (var j=0; j<lexems.length; j++)
 		{
 			if (lastPos < lexems[j].pos)
 			{
 				var span = document.createElement('SPAN');
 				span.appendChild( document.createTextNode( txtLines[i].substring( lastPos, lexems[j].pos ) ) );
-				span.className = classes;
+				span.className = classes + 'text';
 				li.appendChild( span );
 			}
 			lastPos = lexems[j].pos + lexems[j].length;
 			
 			var span = document.createElement('SPAN');
-			span.className = classes + lexems[j].name;
-			span.appendChild( document.createTextNode( txtLines[i].substr( lexems[j].pos, lexems[j].length ) ) );
-			li.appendChild( span );
 			
 			if (! nested[lexems[j].name]) nested[lexems[j].name] = 0;
 			if (lexems[j].extra == '<')
+			{
+				span.className = classes + lexems[j].name + '_start';
 				nested[ lexems[j].name ]++
+			}
 			else if (lexems[j].extra == '>')
-				nested[ lexems[j].name ]--
-			//alert(nested.toSource());
+			{
+				span.className = classes + lexems[j].name + '_end';
+				nested[ lexems[j].name ]--	
+			}	
+			else
+			{
+				span.className = classes + lexems[j].name;
+			}
+					
+			span.appendChild( document.createTextNode( txtLines[i].substr( lexems[j].pos, lexems[j].length ) ) );
+			li.appendChild( span );
+			
+			var classes = '';
+			for (var k in nested)
+			{
+				if (nested[k])
+					classes += k + ' ';
+			}
 		}
 		
 		if (lastPos < txtLines[i].length)
 		{
 			var span = document.createElement('SPAN');
+			span.className = classes + 'text';
 			span.appendChild( document.createTextNode( txtLines[i].substring( lastPos ) ) );
 			li.appendChild( span );
-		}	
-			
+		}
+
 		ul.appendChild( li );
 	}
 }
@@ -165,25 +176,30 @@ function javaScriptBenchmark( what, reportHandle )
 	white-space: pre;
 }
 
-.PHP {
-	/*color: red;*/
+.PHP_start, .PHP_end {
+	color: red;
+	font-weight: bold;
 }
-.MultiLineComment {
+.Comment_start, .Comment_end, .Comment {
 	color: gray;
 }
-.DoubleQuoteString, .SingleQuoteString, .HeredocString {
-	color: magenta;
+.DoubleQuoteString_start, .DoubleQuoteString_end, .DoubleQuoteString,
+.SingleQuoteString_start, .SingleQuoteString_end, .SingleQuoteString,
+.HeredocString_start, .SingleQuoteString_end, .SingleQuoteString {
+	color: green;
 }
 .Variable {
 	color: blue;
 }
+.Number {
+	color: red;
+}
+.Ident {
+	color: black;
+}
 </style>
 </head>
 <body>
-
-<ul id="UL">
-</ul>
-
 
 <div class="source">
 	<a href="javascript:javaScriptBenchmark('doIt(\'xml\')', document.getElementById('out'))">XML</a>
@@ -453,5 +469,11 @@ $flv->close();
 
 <div id="out"></div>
 <textarea id="txt" cols="100"></textarea>
+
+
+<ul id="UL">
+</ul>
+
+
 </body>
 </html>
