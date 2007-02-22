@@ -31,7 +31,7 @@
 				<template ref="PHPSimpleParsingVariable" />
 			</rule>		
 			<!-- Heredoc strings -->
-			<rule name="HeredocString" start="&lt;&lt;&lt;([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$" end="^#BACKREFERENCE1#;?$">
+			<rule name="HeredocString" start="&lt;&lt;&lt;([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$" end="^#BACKREF1#;?$">
 				<rule name="Backslash" start="\\\$" />
 				<template ref="PHPComplexParsingVariable" />
 				<template ref="PHPSimpleParsingVariable" />

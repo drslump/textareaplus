@@ -10,7 +10,7 @@
 		<rule name="MultiLineComment" start="\/\*" end="\*\/" />
 
 		<!-- match single or double quoted strings supporting \' \" and multiline with ending \ -->
-		<rule name="SingleQuoteString" start="([&quot;'])" end="\1|$">
+		<rule name="SingleQuoteString" start="([&quot;'])" end="#BACKREF1#|$">
 			<rule name="BackslashMultiline" start="\\$" />
 			<rule name="BackslashOctal" start="\\[0-7]{1,3}" />
 			<rule name="BackslashHex" start="\\x[0-9A-Fa-f]{2}" />

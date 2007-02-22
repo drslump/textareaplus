@@ -6,21 +6,39 @@
 			<rule name="Entity" start="&amp;[A-Za-z]+;" />
 			<rule name="Unicode" start="&amp;#[0-9]+;" />
 		</template>
+		<template id="XML_Attributes">
+			<rule name="Attribute" start="[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*" />
+			<rule name="Operator" start="=" />
+			<rule name="Value" start="([&quot;|'])" end="#BACKREF1#">
+				<template ref="XML_Entities" />
+			</rule>		
+		</template>		
 	</templates>
 	
 	<!-- Order of the rules matters -->	
 	<rules>
-		<rule name="Tag" start="&lt;[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*" end=">">
-			<rule name="Attribute" start="[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*" />
-			<rule name="Operator" start="=" />
-			<rule name="Value" start="([&quot;|'])" end="\1">
-				<template ref="XML_Entities" />
-			</rule>
+		<rule name="Pi" start="&lt;\?[A-Za-z_]+[A-Za-z0-9_]*" end="\?>">
+			<template ref="XML_Attributes" />
+		</rule>
+		
+		<rule name="Comment" start="&lt;!--" end="-->" />
+		
+		<rule name="CData" start="&lt;!\[CDATA\[" end="\]\]>" />
+		
+		<rule name="ConditionStart" start="&lt;!\[[^\s\[]+\[" />
+		<rule name="ConditionEnd" start="\]\]>" />
+
+		<rule name="Definition" start="&lt;![A-Za-z]+" end=">">
+			<rule name="String" start="([&quot;|'])" end="#BACKREF1#" />		
+		</rule>
+				
+		<rule name="Tag" start="&lt;[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*" end="/?>">
+			<template ref="XML_Attributes" />
 		</rule>
 		
 		<template ref="XML_Entities" />
 		
-		<rule name="EndTag" start="&lt;\/[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*>" />
+		<rule name="TagEnd" start="/>|&lt;\/[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*>" />
 	</rules>
 	
 	<tests>	
