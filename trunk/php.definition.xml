@@ -7,7 +7,9 @@
 			<rule name="Variable" start="(?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*" end="\}">
 				<rule name="Operator" start="-&gt;|[\[\]]" />
 				<rule name="Ident" start="\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b" />
-				<rule name="SingleQuoteString" start="'[^'\\]*(?:\\.[^'\\]*)*'" />	
+				<rule name="SingleQuoteString" start="'" end="'">
+					<rule name="Backslash" start="\\'" />
+				</rule>
 			</rule>
 		</template>
 		<!-- match a parsing-variable like $foo or $foo->bar -->

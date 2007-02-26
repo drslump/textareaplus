@@ -89,7 +89,7 @@ function TAP_Buffer_Line( txt, status ) {
     this.source = typeof(txt) == 'undefined' ? '' : txt;
     this.dirty = typeof(status) == 'undefined' ? LINE_INSERTED : status;
     this.blocks = [];
-    this.state = [];    
+    this.state = [];
 };
 
 
@@ -389,7 +389,7 @@ TAP_Buffer.prototype.buildTokenizer = function ( def, endPattern )
     {
         if ( def[i].keywords )
         {
-        		tokenizer.keywordIndex = i;
+        	tokenizer.keywordIndex = i;
             tokenizer.keywords = new RegExp('(?:^|\\W)(' + def[i].keywords.join('|') + ')(?:\\W|$)', def[i].ignoreCase ? 'gi' : 'g');
             tokenizer.keywordStyle = def[i].css;
         }
