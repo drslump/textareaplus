@@ -15,335 +15,18 @@ Other implementations:
 	Workspace, web based IDE: http://www.createworkspace.com/
 */
 
-/* 
-Constants: 
-*/
-var TAP_STATUS_OK = 0;
-var TAP_STATUS_CHANGED = 1;
 
-/*
-Class: TAP_Buffer
-	A class which represents a text document using the _Line Span_ method
-
-See Also:
-	<TAP_Buffer_Line>
-
-Arguments: 
-	lexer - (optional) a lexer definition object
-	src - string: (optional) the initial contents for the buffer
-*/
-function TAP_Buffer( /** Object */ lexer, /** String */ src )
-{
-	this.lexer = lexer ? lexer : null;
-	this.lines = [];
-	this.col = 0;
-	this.row = 0;
-	this.lineEnd = '\n';
-	this.charCount = 0;
-		
-	this.read( src );
-}
-
-/**
- * Replaces the buffer contents with a new text 
- *
- * @param {String}	src		The new text to be used in the buffer
- */
-TAP_Buffer.prototype.read = function( /** String */ src )
-{
-	this.clear();
-	
-	this.insert( src );
-}
-
-/**
- * Returns a string with the contents of the buffer as UTF-16
- * 
- * @return String	The contents of the buffer as a JavaScript string
- */	
-TAP_Buffer.prototype.write = function()
-{
-	var /** String */ s = '';
-	for (var i=0; i<this.lines.length; i++)
-	{
-		s += this.lines[i].src + this.lineEnd;
-	}
-	return s;
-}
-
-/**
- * Clears the text buffer initializing all its parameters
- */
-TAP_Buffer.prototype.clear = function()
-{
-	this.lines = [];
-	this.charCount = 0;
-	this.col = 0;
-	this.row = 0;
-	
-	// create a first empty line
-	this.lines.push( new TAP_Buffer_Line( this, '' ) );	
-}
-
-/**
- * Positions the internal cursor
- * 
- * @param	Number 	row		The buffer row
- * @param	Number	col		The buffer col
- * @return	Boolean			True on success False if desired position outside the limits
- */
-TAP_Buffer.prototype.setCursor = function( /** Number */ row, /** Number */ col )
-{
-	if (row < 0 ||
-		col < 0 || 
-		row >= this.lines.length ||
-		col > this.lines[row].src.length)
-		return false;
-	
-	this.row = row;
-	this.col = col;
-	return true;
-}	
-
-/**
- * Positions the internal cursor based on the current position
- * 
- * @param	Number	rows	The number of rows to move: negative up, positive down
- * @param	Number	cols	The number of columns to move: negative left, positive right
- * @return	Boolean			True on success False if position is outside the limits
- */
-TAP_Buffer.prototype.moveCursor = function( /** Number */ rows, /** Number */ cols )
-{
-	return this.setCursor( this.row + rows, this.col + cols );
-}
-
-/**
- * Returns the current cursor position
- * 
- * @return	Object	The current row and column as an object
- */
-TAP_Buffer.prototype.getCursor = function()
-{
-	return { 'row' : this.row, 'col' : this.col };
-}	
+var TAP = {
+	// Constants
+	STATUS_OK		: 0,
+	STATUS_CHANGED 	: 1
+};
 
 
-/**
- * Returns the current character
- * 
- * @return	String	The current character
- */		
-TAP_Buffer.prototype.getChar = function()
-{
-	return this.getString( 1 );
-}
-
-/**
- * Returns the current line as a string
- * 
- * @return	String	The current line
- */
-TAP_Buffer.prototype.getLine = function()
-{
-	return this.lines[this.row].src;
-}
-
-/**
- * Returns a string of N chars from the from the current position
- * 
- * @param	{int}	cnt	The number of chars to get
- * @return	{String}	The string
- */
-TAP_Buffer.prototype.getString = function( /** Number */ cnt )
-{
-	var s = this.getLine();
-	return s.substr( this.col, cnt );
-}
-		
-/**
- * Return the number of chars in the buffer
- * 
- * @return	{int}	The number of chars
- */
-TAP_Buffer.prototype.getCharCount = function()
-{
-	// number of chars plus the number of CR
-	return this.charCount + ( this.getLineCount() * this.lineEnd.length );
-}
-
-/**
- * Returns the number of lines in the buffer
- * 
- * @return	{int}	The number of lines
- */
-TAP_Buffer.prototype.getLineCount = function()
-{
-	return this.lines.length;
-}	
-
-/**
- * Inserts a string in the buffer
- * 
- * @param	{String}	src	The string to insert (can be composed of multiple lines)
- * @return	{int}			Actually inserted chars
- */
-TAP_Buffer.prototype.insert = function( /** String */ src )
-{
-	var inserted = 0;
-	var lines = src.split(/\r\n|\r|\n/);
-	
-	var s = this.getLine();	
-	var i;
-	for (i=0; i<lines.length; i++)
-	{		
-		if (i === 0)
-		{
-			this.lines[this.row].src = s.substr( 0, this.col ) + lines[0];	
-		}
-		else
-		{
-			// make room for a new line
-			this.lines.splice( this.row+i, 0, new TAP_Buffer_Line( this, lines[i] ) );	 
-		}
-
-		this.lines[this.row+i].status = TAP_STATUS_CHANGED;
-				
-		inserted += lines[i].length;
-	}
-	
-	this.lines[this.row + i - 1].src += s.substring( this.col );
-	this.charCount += inserted;
-	
-	// if lexer is enabled analyze the changed lines
-	if (this.lexer)
-	{
-		var j = 0;
-		var lex = this.lines[this.row].lexer ? this.lines[this.row].lexer : this.lexer;	
-		while ( this.lines[this.row+j] && (j < i || lex != this.lines[this.row+j].lexer) )
-		{
-			this.lines[this.row+j].lexer = lex;
-			lex = this.lines[this.row+j].scan();
-			j++;
-		}
-		console.log('LEXER RUN ON %d LINES', j);
-	}	
-	
-	return inserted;
-}
 
 
-/**
- * Instantiates a TAP_Buffer_Line object which represents a line of text
- *
- * @class This class holds a single line of text in a text buffer
- * @see TAP_Buffer
- * @see TAP_Buffer_Lexem
- *
- * @constructor
- * @param	{TAP_Buffer}	buffer	The TAP_Buffer object where this line belongs
- * @param	{String}		src 	Optional text to assign to this line
- * @param	{Object}		lexer	Optional lexer object with the rules at the start of the line
- */
-function TAP_Buffer_Line( /** TAP_Buffer */ buffer, /** String */ src, /** Object */ lexer )
-{
-	this.buffer = buffer;
-	this.status = TAP_STATUS_CHANGED;
-	this.src = src;
-	this.lexer = lexer;
-	this.lexems = [];
-	this.currentLexem = 0;
-	this.data = {};
-	
-	// Since we are using it as a callback function we need to use a closure instead of 
-	// extending the object prototype
-	var $this = this;
-	this.addLexem = function ( name, extra, pos, length ) 
-	{		
-		if (name == 'Ident')
-		{
-			if (/^(include_once|class|extends|var)$/.test( $this.src.substr(pos,length) ))
-			{
-				name = 'Keyword';
-			}
-		} 
-		else if (name == 'Operator')
-		{
-			var braces = $this.getData( 'braces' );
-			if (!braces) braces = [];
-			
-			switch ( $this.src.substr(pos, length) )
-			{
-				case '{': braces.push( { name: 'lcurly', pos: pos } ); break;
-				case '}': braces.push( { name: 'rcurly', pos: pos } ); break;
-				case '[': braces.push( { name: 'lsquare', pos: pos } ); break;
-				case ']': braces.push( { name: 'rsquare', pos: pos } ); break;
-				case '(': braces.push( { name: 'lparen', pos: pos } ); break;
-				case ')': braces.push( { name: 'rparen', pos: pos } ); break;
-			}
-			$this.setData( 'braces', braces );
-		}
-		else if (name == 'Variable')
-		{
-			var braces = $this.getData( 'braces' );
-			if (!braces) braces = [];
-					
-			if (extra == '<' && $this.src[pos] == '{')
-				braces.push( { name: 'lcurly', pos: pos } );
-			else if (extra == '<' && $this.src[pos+1] == '{')
-				braces.push( { name: 'lcurly', pos: pos+1 } );
-			else if (extra == '>')
-				braces.push( { name: 'rcurly', pos: pos } );
-				
-			$this.setData( 'braces', braces );
-		}		
-		
-		$this.lexems.push( new TAP_Buffer_Lexem( name, extra, pos, length ) );
-		//console.log('LEXEM "%s" FOUND AT %d : <%s>', name, pos, $this.src.substr(pos, length)); 
-	}
-}
 
-TAP_Buffer_Line.prototype.getData = function ( /** String */ key )
-{
-	return this.data[ key ];
-}
 
-TAP_Buffer_Line.prototype.setData = function ( /** String */ key, value )
-{
-	this.data[ key ] = value;
-}
-
-/**
- * Scans the line text to extract the lexems contained in it
- *
- * @return	Object	The lexer used at the end of the current line
- */
-TAP_Buffer_Line.prototype.scan = function ()
-{
-	this.lexems = [];
-	this.data = {};
-	return TAP_Lexer_Scan( this.lexer, this.src, this.addLexem );
-}
-
-/**
- * Returns the next lexem for the line
- *
- * @return	TAP_Buffer_Lexem	A lexem object or null if no more lexems available
- */
-TAP_Buffer_Line.prototype.nextLexem = function ()
-{
-	if (this.currentLexem >= this.lexems.length)
-		return null;
-
-	return this.lexems[ this.currentLexem++ ];
-}
-
-/**
- * Resets the lexems pointer for this line
- */
-TAP_Buffer_Line.prototype.reset = function ()
-{
-	this.currentLexem = 0;
-}
 
 
 /**
@@ -359,13 +42,13 @@ TAP_Buffer_Line.prototype.reset = function ()
  * @param	{Number}	pos		char position of the lexem in the line
  * @param	{Number}	length	char length of the lexem
  */
-function TAP_Buffer_Lexem( /** String */ name, /** String */ flag, /** Number */ pos, /** Number */ length )
-{
-	this.name = name;
-	this.extra = extra;
-	this.pos = pos;
-	this.length = length;
-}
+//TAP.Buffer.Lexem = function ( /** String */ name, /** String */ flag, /** Number */ pos, /** Number */ length ) {
+//	this.name = name;
+//	this.extra = extra;
+//	this.pos = pos;
+//	this.length = length;
+//}
+
 
 
 
@@ -536,21 +219,29 @@ function newKey(e)
     }
 }
 
-
+var lex_PHP = {
+	match	: /<\?(=?|[Pp][Hh][Pp]\b)/,
+	end		: /\?>/,
+	name	: 'PHP',
+	captures: {
+	},
+	children: [
+	],
+	repository: {
+	}
+};
 
 var lexems = [];
 
 var buffer;
 
-function doIt( id )
-{
+function doIt( id ) {
 	var php={n:"text",r:/(<\?(?:[pP][hH][pP]\b|=|\s|$))/gm};php.c=[];php.c[0]={n:"PHP",r:/((?:\/\/|#).*$)|(\/\*)|(")|(<<<([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$)|(')|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\b[+-]?0[Xx][0-9A-Fa-f]+\b)|(\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b)|(\b[+-]?0[0-9]+\b)|(\b[+-]?[0-9]+\b)|(~|\|\||\|\=|\||\^\=|\^|@|\?(?!>)|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|<\=|<<\=|<<|<|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&\=|&&|&|%\=|%\=|%|%|\!\=\=|\!\=|\!|\[|\]|\(|\)|\{|\}|\;)|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|(\?>)/gm};php.c[0].c=[];php.c[0].c[0]={n:"Comment"};php.c[0].c[0].p=php.c[0];php.c[0].c[1]={n:"Comment",r:/(\*\/)/gm};php.c[0].c[1].c=[];php.c[0].c[1].p=php.c[0];php.c[0].c[2]={n:"DoubleQuoteString",r:/(\\.)|((?:\$\{|\{\$)[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)|(")/gm};php.c[0].c[2].c=[];php.c[0].c[2].c[0]={n:"Backslash"};php.c[0].c[2].c[0].p=php.c[0].c[2];php.c[0].c[2].c[1]={n:"Variable",r:/(->|[\[\]])|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|('[^'\\]*(?:\\.[^'\\]*)*')|(\})/gm};php.c[0].c[2].c[1].c=[];php.c[0].c[2].c[1].c[0]={n:"Operator"};php.c[0].c[2].c[1].c[0].p=php.c[0].c[2].c[1];php.c[0].c[2].c[1].c[1]={n:"Ident"};php.c[0].c[2].c[1].c[1].p=php.c[0].c[2].c[1];php.c[0].c[2].c[1].c[2]={n:"SingleQuoteString"};php.c[0].c[2].c[1].c[2].p=php.c[0].c[2].c[1];php.c[0].c[2].c[1].p=php.c[0].c[2];php.c[0].c[2].c[2]={n:"Variable"};php.c[0].c[2].c[2].p=php.c[0].c[2];php.c[0].c[2].p=php.c[0];php.c[0].c[3]={n:"HeredocString",s:1,t:"(\\\$)|((?:\$\{|\{\$)[a-zA-Z_\\x7f-\\xff][a-zA-Z0-9_\\x7f-\\xff]*)|(\$[a-zA-Z_\\x7f-\\xff][a-zA-Z0-9_\\x7f-\\xff]*)|(^#BACKREF1#;?$)"};php.c[0].c[3].c=[];php.c[0].c[3].c[0]={n:"Backslash"};php.c[0].c[3].c[0].p=php.c[0].c[3];php.c[0].c[3].c[1]={n:"Variable",r:/(->|[\[\]])|(\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b)|('[^'\\]*(?:\\.[^'\\]*)*')|(\})/gm};php.c[0].c[3].c[1].c=[];php.c[0].c[3].c[1].c[0]={n:"Operator"};php.c[0].c[3].c[1].c[0].p=php.c[0].c[3].c[1];php.c[0].c[3].c[1].c[1]={n:"Ident"};php.c[0].c[3].c[1].c[1].p=php.c[0].c[3].c[1];php.c[0].c[3].c[1].c[2]={n:"SingleQuoteString"};php.c[0].c[3].c[1].c[2].p=php.c[0].c[3].c[1];php.c[0].c[3].c[1].p=php.c[0].c[3];php.c[0].c[3].c[2]={n:"Variable"};php.c[0].c[3].c[2].p=php.c[0].c[3];php.c[0].c[3].p=php.c[0];php.c[0].c[4]={n:"SingleQuoteString",r:/(\\')|(')/gm};php.c[0].c[4].c=[];php.c[0].c[4].c[0]={n:"Backslash"};php.c[0].c[4].c[0].p=php.c[0].c[4];php.c[0].c[4].p=php.c[0];php.c[0].c[5]={n:"Variable"};php.c[0].c[5].p=php.c[0];php.c[0].c[6]={n:"Number"};php.c[0].c[6].p=php.c[0];php.c[0].c[7]={n:"Number"};php.c[0].c[7].p=php.c[0];php.c[0].c[8]={n:"Number"};php.c[0].c[8].p=php.c[0];php.c[0].c[9]={n:"Number"};php.c[0].c[9].p=php.c[0];php.c[0].c[10]={n:"Operator"};php.c[0].c[10].p=php.c[0];php.c[0].c[11]={n:"Ident"};php.c[0].c[11].p=php.c[0];php.c[0].p=php;
 	lexer = php;
 	
 	var src = document.getElementById( id ).value;
 	
-	
-	buffer = new TAP_Buffer( php, src );
+	buffer = new TAP.Buffer( php, src );
 	
     document.getElementById('in').addEventListener( 'keypress', newKey, false );	
 }
@@ -579,4 +270,4 @@ function javaScriptBenchmark( what, reportHandle )
 	for( currentWhat in document.timeStamps )
 	report += document.timeStamps[ currentWhat ][ 1 ]?currentWhat +"\n________________________________________\ntook in average ~"+ document.timeStamps[ currentWhat ][ 2 ] +"ms after "+ document.timeStamps[ currentWhat ][ 1 ] +" execution(s)\n\n\n":""
 	!reportHandle?alert( report ):reportHandle.innerHTML = report.replace( /\n________________________________________\n/g, "<hr/>" ).replace( /\t/g, "&nbsp; &nbsp; &nbsp;" ).replace( /\n/g, "<br/>" )
-}}
+}
