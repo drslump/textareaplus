@@ -1,0 +1,509 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Insert title here</title>
+
+<script language="javascript">
+
+
+function LexerContext( name, startRule, endRule, rules ) 
+{
+	this.name = name;
+	
+	if (typeof(startRule) == 'function')
+		this.re = String(startRule).substring( String(startRule).indexOf('/')+1, String(startRule).lastIndexOf('/') );
+	else
+		this.re = startRule;
+	
+	// find capturing parenthesis by removing the escaped backslashes first...
+	var reStr = this.re.replace(/\\\\/g, '');
+	// and get all non-escaped parenthesis not followed by a question mark
+	var result = reStr.match( /([^\\]|^)\(([^\?]|$)/g );
+	if (result)
+		this.parenthesis = result.length;
+	else
+		this.parenthesis = 0;
+
+	if (typeof(endRule) == 'function')
+		this.endRe = String(endRule).substring( String(endRule).indexOf('/')+1, String(endRule).lastIndexOf('/') );
+	else
+		this.endRe = endRule;
+	
+	this.rules = rules;
+}
+
+function LexerToken( name, rule )
+{
+	this.name = name;
+	
+	if (typeof(rule) == 'function')
+		this.re = String(rule).substring( String(rule).indexOf('/')+1, String(rule).lastIndexOf('/') );
+	else
+		this.re = rule;	
+}
+
+function LexerKeywords( name, casesensitive, special, keywords )
+{
+	this.name = name;
+	//this.casesensitive = casesensitive;
+	
+	// first we sort the keywords
+	keywords.sort();
+	// Now we reverse the previous sort so we have the keywords properly 
+	// ordered to build the regular expression
+	keywords.reverse();
+	
+	
+	// Optimize the keyword list by finding common prefixes. This could be implemented much better
+	// by weighting all the possibilities, instead it currently just match the first prefix found.
+	// i.e: mysql_connect, mysql_fetch_row, mysql_fetch_assoc, mysql_fetch_array
+	// becomes: mysql_(connect|fetch_row|fetch_assoc|fetch_array)
+	// instead of: mysql_connect|mysql_fetch_(row|assoc|array)
+	// or even: mysql_(connect|fetch_(row|assoc|array))
+
+	//TODO: Benchmark if the optimization is really somewhat faster
+	
+	var reStrings = [];
+	var bucket = [];
+	var prefix, count, size;
+	var optionalSuffix;
+	var escapeRe = /[\|\[\]\(\)\^\$\.\*\+\?\!\{\}\,\=\\]/g; //escapes regexp special chars
+	
+	this.minLength = 0;	
+	
+	for (var i=0; i<keywords.length; i++)
+	{
+		//console.log('Keyword: %s', keywords[i]);
+	
+		if (!this.minLength || keywords[i].length < this.minLength)
+			this.minLength = keywords[i].length; 
+		
+		count = 1;
+		prefix = 0;
+		
+		while ( i+count < keywords.length )
+		{
+			lastPrefix = prefix;
+			
+			// find first different character starting from the left
+			prefix = Math.min( keywords[i].length, keywords[i+count].length );
+			for (var j=0; j<prefix; j++)
+			{
+				if ( keywords[i].charAt(j) != keywords[i+count].charAt(j) )
+				{
+					prefix = j;
+					break;
+				}
+			}
+
+			//console.log('  Current: %s, Count: %d, Prefix: %d', keywords[i+count], count, prefix);
+			
+			if ( prefix < 3 || lastPrefix-prefix > 2 )
+				break;
+			else
+				count++
+		}
+
+		if ( count > 2 )
+		{
+			optionalSuffix = false;
+			bucket = keywords.slice( i, i+count );
+			for (var j=0; j<bucket.length; j++)
+			{
+				bucket[j] = bucket[j].substr( lastPrefix ).replace( escapeRe, '\\$&' );
+				if ( !bucket[j].length )
+					optionalSuffix = true;
+			}
+			
+			
+			reStrings.push( keywords[i].substr(0, lastPrefix).replace( escapeRe, '\\$&' ) + '(?:' + bucket.join('|') + ')' + (optionalSuffix ? '?' : '') );
+		
+			//console.log('  PREFIX: %s, Keywords: %s', keywords[i].substr(0, lastPrefix), bucket);
+					
+			//skip already optimized items
+			i += count-1;
+		}
+		else
+		{ 
+			reStrings.push( keywords[i].replace( escapeRe, '\\$&' ) );
+		}
+	}
+	
+	this.re = new RegExp( (special ? '\\'+special : '') + '(?:' + reStrings.join('|') + ')' + (special ? '\\' + special : ''), casesensitive ? 'g' : 'gi' );
+	
+	//console.log('RE: %s', this.re);
+}
+
+
+function BuildLexer( definition, endRe, parent )
+{
+	function getObjectType( obj )
+	{
+		var arr = obj.constructor.toString().match( /function\s+([A-Z_]+[A-Z0-9_]*)\s*\(/i );
+		if (arr[1])
+			return arr[1];
+		else
+			return false;
+	}
+	
+    var token;
+    var tokenizer = {
+    	'parent': parent ? parent : null,
+    	're'	: null,
+    	'tokens': [],
+    	'keywords': []
+    };
+    var tokensReArr = [];
+    var keywordsReArr = [];
+    
+    for (var i=0; i < definition.length; i++)
+    {
+    	token = {
+    		'name'			: definition[i].name,
+    		'prevContext'	: tokenizer,
+    		'nextContext'	: null,
+    		'parenthesis'	: 0
+    	};
+    	
+    	switch ( getObjectType( definition[i] ) )
+    	{
+    		case 'LexerContext':
+	    		token.parenthesis = definition[i].parenthesis;
+				token.nextContext = BuildLexer( definition[i].rules, definition[i].endRe, token );
+				tokensReArr.push( definition[i].re );
+		       	tokenizer.tokens.push( token );
+       		break;
+       		case 'LexerToken':
+       			tokensReArr.push( definition[i].re );
+		       	tokenizer.tokens.push( token );       			
+       		break;
+       		case 'LexerKeywords':
+       			token.re = definition[i].re;
+       			token.weight = tokensReArr.length;
+       			token.minLength = definition[i].minLength;
+       			tokenizer.keywords.push( token );
+       		break;
+       		default:
+       			alert('FATAL ERROR: The definition object seems to be corrupted');
+       	}
+
+    }
+    
+	if (endRe)
+		tokensReArr.push( endRe );
+	
+	if (tokensReArr.length)
+	{
+		tokenizer.re = new RegExp( '(' + tokensReArr.join(')|(') + ')', 'g' );
+		tokenizer.template = '(' + tokensReArr.join(')|(') + ')';
+	}
+
+	return tokenizer;
+}
+
+
+
+// define some commonly used constructs
+// Note: Rules can be defined as a string or as a regexp literal WITHOUT modifiers
+
+// match a complex-parsing-variable like ${foo}, {$foo->bar}, ${foo['bar'][2]} ...
+var PHPComplexParsingVariable = new LexerContext( 'Variable', /(?:\$\{|\{\$)(?:[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(?:->)?)+/, /\}/,
+	[
+		// match single-quoted no-multiline strings supporting \'
+		new LexerToken( 'SingleQuoteString', /'[^'\\]*(?:\\.[^'\\]*)*'/ ),
+	]
+);
+
+// match a parsing-variable like $foo or $foo->bar
+var PHPSimpleParsingVariable = new LexerToken( 'Variable', /\$(?:[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(?:->)?)+/ );
+
+
+//Order matters!
+var Lexer_Definition_PHP = [
+	// single-line comments, either // or # style
+	new LexerToken( 'SingleLineComment', /(?:\/\/|#).*$/ ),
+	// multi-line comments
+	//new LexerContext( 'MultiLineComment', /\/\*/, /\*\//, [] ),
+	new LexerContext( 'MultiLineComment', /(\/)(\*)/, /#BACKREFERENCE2##BACKREFERENCE1#/, [] ),
+
+	// match double-quoted-strings with support for parsing variables
+	new LexerContext( 'DoubleQuoteString', /"/, /"/,
+		[
+			// match \", \$ and the like			
+			new LexerToken( 'Backslash', /\\./ ),
+			PHPComplexParsingVariable,
+			PHPSimpleParsingVariable
+			
+		]
+	),
+	// Heredoc strings
+	new LexerContext( 'HeredocString', /<<<([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$/, /^#BACKREFERENCE1#;?$/, 
+		[
+			// match \$
+			new LexerToken( 'Backslash', /\\\$/ ),
+			PHPComplexParsingVariable,
+			PHPSimpleParsingVariable
+		]
+	),
+	// match single-quoted multiline strings supporting \'
+	new LexerContext( 'SingleQuoteString', /'/, /'/,
+		[
+			// match \'
+			new LexerToken( 'Backslash', /\\'/ )
+		]
+	),
+
+	// Variables
+	new LexerToken( 'Variable', /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/ ),
+	
+	// Numbers
+	new LexerToken( 'NumberHex', /\b[+-]?0[Xx][0-9A-Fa-f]+\b/ ),
+	new LexerToken( 'NumberFloat', /\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b/ ),
+	new LexerToken( 'NumberOctal', /\b[+-]?0[0-9]+\b/ ),
+	new LexerToken( 'NumberInt', /\b[+-]?[0-9]+\b/ ), 
+
+	// Operators
+	// TODO: optimize it by placing the single-char operators in a class [\.~<>]
+	new LexerToken( 'Operator', /~|\|\||\|\=|\||\^\=|\^|@|\?|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|<\=|<<\=|<<|<|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&\=|&&|&|%\=|%\=|%|%|\!\=\=|\!\=|\!/ ),	
+		
+	// Control Structures
+	new LexerKeywords( 'ControlStructure', false, 'b',
+		[ 
+			'if', 'else', 'elseif', 'endif', 'while', 'endwhile', 'do', 'for', 'endfor', 
+			'foreach', 'endforeach', 'break', 'continue', 'switch', 'endswitch', 'case', 
+			'default', 'as', 'declare', 'return', 'require', 'include', 'require_once', 
+			'include_once'
+		]
+	),
+
+	// Operators
+	new LexerKeywords( 'Operator', false, 'b',
+		[
+			'new',
+			'and', 'xor', 'or',
+			'instanceof',
+		]
+	),
+	
+	// Keywords
+	new LexerKeywords( 'Keyword', false, 'b',
+		[
+			'abstract', 'catch', 'class', 'const', 'extends', 'final', 'function', 'implements', 
+			'interface', 'new', 'self', 'static', 'parent', 'private', 'protected', 'public', 
+			'throw', 'try', 'var'
+		]
+	),
+	
+	// Idents
+	new LexerToken( 'Ident', /[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/ )	
+
+];
+
+//console.log(lexer.toSource());
+
+function addToken( token, value )
+{
+	console.log('ADDTOKEN %s: %s', token.name, value);
+}
+
+
+function parseLine( src, token )
+{  
+	function findKeywords( payload, context, single, weight )
+	{
+		var unmatched, keyword, j;
+		var pos = 0;
+		var trimmed = payload.replace(/\s*(.*?)\s*/, '\1');
+		
+		if (!context.keywords || !trimmed.length)
+			return 0;
+			
+		for (j=0; j<context.keywords.length; j++)
+		{
+			if (context.keywords[j].minLength > trimmed.length)
+				continue;
+			
+	    	unmatched = keyword = '';
+	    	context.keywords[j].re.lastIndex = 0;
+	    	if ( (kwmatch = context.keywords[j].re.exec( payload )) !== null )
+	    	{
+	    		if (single && context.keywords[j].weight > weight)
+	    		{
+	    			return pos;
+	    		}
+	    		else if (single && !kwmatch.index)
+	    		{
+	    			addToken( context.keywords[j], kwmatch[0] );
+	    			return kwmatch[0].length;
+	    		}
+	    		else if (!single)
+	    		{    				
+	    			if (kwmatch.index > 0)
+	    				addToken( context.parent, payload.substr( 0, kwmatch.index ) );
+	    		
+	    			addToken( context.keywords[j], kwmatch[0] );
+	    		
+	    			pos += kwmatch.index + kwmatch[0].length;
+	    			payload = payload.substring( pos );
+	    			trimmed = payload.replace(/\s*(.*?)\s*/, '\1');
+	    			if (!trimmed.length)
+	    				return pos;
+	    				
+	    			j = -1;
+	    			continue;
+	    		}
+	    	}
+		}
+
+		return pos;
+	}
+       
+    var escapeRe = /[\|\[\]\(\)\^\$\.\*\+\?\!\{\}\,\=\\]/g;
+    
+    var i, j;
+    var endPos = 0;
+    var idx, tkn;
+    var kwsize = 0;
+    
+    var match;
+    var found;
+    var dinamic;
+
+    
+    // Set the current context
+    var ctx = token.nextContext;
+    
+    //console.log( token.nextContext.re.toSource() );
+      
+	//reset the regular expression
+    ctx.re.lastIndex = 0;
+    // find next token
+    while ( (match = ctx.re.exec( src )) !== null )
+    {
+    	console.log('Match: %s (endPos: %d, index: %d) Re: ', match[0], endPos, match.index, ctx.re.toSource());
+    	
+    	dinamic = false;
+    	found = false;
+
+		// check for keywords in the unmatched text before the found token
+		if ( endPos < match.index && ctx.keywords )
+		{	
+			endPos += findKeywords( src.substring( endPos, match.index ), ctx );
+		}
+		   		
+		// add the remaining unmatched text before the found token
+		if ( endPos < match.index )
+		{
+			addToken( ctx.parent, src.substring( endPos, match.index ) );
+			endPos = match.index;
+		}
+
+
+		// loop thru the captured parenthesis to find the matched token
+		idx = 0; tkn = 0;
+        for (i=1, j=0; j < ctx.tokens.length; i++, j++)
+        { 
+        	if (match[i])
+        	{
+        		idx = i;
+        		tkn = j;
+        		break;
+        	}
+        	
+        	if (ctx.tokens[j].parenthesis)
+        		i += ctx.tokens[j].parenthesis;        
+        }
+        
+        // check if a keyword matches just at the same position and has a higher preference
+        if (kwsize = findKeywords( src.substring( match.index ), ctx, true, tkn ))
+        {
+        	found = true;
+        	endPos += kwsize;
+        }
+                
+        // No keywords found at the same position
+        if (!found)
+        {          
+        	// check if the end of context one was
+        	if (!ctx.tokens[tkn])
+        	{
+            	console.log('END OF CONTEXT FOUND: %s', match[0]);
+                        
+            	addToken( ctx.parent, match[0] );
+            
+            	ctx = ctx.parent.prevContext;
+        	}
+        	// The token opens a new context        	
+        	else if (ctx.tokens[tkn].nextContext)
+        	{
+        		addToken( ctx.tokens[tkn], match[0] );
+        		
+				console.log('START OF CONTEXT FOUND (' + ctx.tokens[tkn].name + ') : ' + match[0]);
+ 
+                // we have matched a dinamic context, so we need to rebuild the escape rule
+                if (ctx.tokens[tkn].parenthesis)
+                {
+                	dinamic = ctx.tokens[tkn].nextContext.template;
+                    console.log('TEMPLATE: ' + dinamic);
+                    for (j=1; j<=ctx.tokens[tkn].parenthesis; j++)
+                    {
+                    	if (match[idx+j])
+                    		dinamic = dinamic.replace( '#BACKREFERENCE'+j+'#', match[idx+j].replace( escapeRe, '\\$&' ) );
+                    }
+                }
+                    
+                // point the active tokenizer to the new context
+                ctx = ctx.tokens[tkn].nextContext;
+                // if it's dinamic then we rebuild the regular expression
+                if (dinamic)
+                	ctx.re = new RegExp( dinamic, 'g' );
+                    
+                console.log('RE: ' + ctx.re);        		
+        	}
+        	// Simple token
+        	else
+        	{
+				addToken( ctx.tokens[tkn], match[0] );
+        	}
+        	
+        	endPos = match.index + match[0].length;
+        }
+        
+      	ctx.re.lastIndex = endPos;
+	}
+	
+	// check for keywords in the remaining text
+	if (endPos < src.length && ctx.keywords)
+	{
+		endPos += findKeywords( src.substring( endPos ), ctx );
+	}
+	
+	// remaining text
+	if (endPos < src.length)
+	{
+		addToken( ctx.parent, src.substring(endPos) );
+	}
+}
+
+
+
+			
+
+
+var phpLexer = { 
+	'name'			: 'php',
+	'prevContext'	: null
+};
+phpLexer.nextContext = BuildLexer( Lexer_Definition_PHP, '', phpLexer );
+
+
+parseLine( ' $var /* as */ function test();', phpLexer );
+//console.log( phpLexer.toSource() );
+</script>
+
+</head>
+<body>
+<div id="out"></div>
+</body>
+</html>
