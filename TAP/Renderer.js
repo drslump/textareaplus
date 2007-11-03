@@ -1,4 +1,5 @@
 /* $Id$
+
 Script: Renderer.js
 
     TextArea+ 0.1 - A source code text editor in Javascript
