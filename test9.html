@@ -1,0 +1,83 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Insert title here</title>
+
+<script language="javascript" type="text/javascript" src="firebug/firebug.js"></script>
+
+<script language="javascript" src="test9.js"></script>
+<script language="javascript" src="TAP/Buffer.js"></script>
+<script language="javascript" src="TAP/Buffer/Line.js"></script>
+<script language="javascript" src="TAP/Lexer.js"></script>
+
+
+<style type="text/css">
+.source textarea {
+	display: none;
+}
+
+#UL {
+	list-style:none;
+	margin: 0;
+	padding: 0;
+	font-family: courier new;
+	font-size: 8pt;
+	white-space: pre;
+}
+
+.PHP_start, .PHP_end {
+	color: red;
+	font-weight: bold;
+}
+.Comment_start, .Comment_end, .Comment {
+	color: gray;
+}
+.DoubleQuoteString_start, .DoubleQuoteString_end, .DoubleQuoteString,
+.SingleQuoteString_start, .SingleQuoteString_end, .SingleQuoteString,
+.HeredocString_start, .SingleQuoteString_end, .SingleQuoteString {
+	color: green;
+}
+.Variable {
+	color: blue;
+}
+.Number {
+	color: red;
+}
+.Ident {
+	color: black;
+}
+.Keyword {
+	color: magenta;
+}
+</style>
+</head>
+<body>
+
+<textarea name="in" id="in"></textarea>
+
+<div class="source">
+	<a href="javascript:javaScriptBenchmark('doIt(\'php\')', document.getElementById('out'))">PHP</a>
+	<textarea id="php">
+&lt;?php
+include_once 'FLV/FLV.php';
+
+class MyFLV extends FLV {
+	
+	/**
+	 * On audio-only files the frame index will use this as minimum gap 
+	 */
+	var $test = 'FLV Tools for PHP v0.1 by DrSlump';
+}
+?&gt;
+	</textarea>
+</div>
+
+<div id="out"></div>
+
+<ul id="UL">
+</ul>
+
+
+</body>
+</html>

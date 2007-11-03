@@ -1,0 +1,479 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Insert title here</title>
+<script language="javascript" type="text/javascript" 
+            src="firebug/firebug.js"></script>
+            
+<script language="javascript" src="textAreaPlus/Lexer.js"></script>         
+<script language="javascript" src="textAreaPlus/LexerTools.js"></script>
+
+<script language="javascript">
+/*
+
+	Another JS lexer: SourceMap http://www.devpro.it/code/126.html
+	PHP version: http://www.phpclasses.org/browse/package/3279.html
+	
+	OverByte Editor (former byteplug), uses SourceMap: http://webreflection.blogspot.com
+	
+	EditArea: http://cdolivet.net/index.php?page=editArea
+	
+	Workspace, web based IDE: http://www.createworkspace.com/
+
+*/
+
+// lexer scanner callback
+function addLexem( name, extra, pos, length, txt )
+{
+	//console.log('LEXEM "%s" [%s] (%d:%d): "%s"', name, extra, pos, length, txt.substr(pos,length));
+	
+	lexems.push( { 'name': name, 'extra': extra, 'pos': pos, 'length': length } );
+}
+
+
+
+var xmlDef;
+var xmlDoc;	
+if (document.implementation && document.implementation.createDocument)
+{
+	xmlDoc = document.implementation.createDocument("", "", null);
+	xmlDoc.onload = function () { xmlDef = TAP_Lexer_XML2Definition(xmlDoc) };
+}
+else if (window.ActiveXObject)
+{
+	xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
+    xmlDoc.async = false; 	
+	xmlDoc.onreadystatechange = function () {
+		if (xmlDoc.readyState == 4) xmlDef = TAP_Lexer_XML2Definition(xmlDoc);			
+	};
+}
+else
+{
+	alert('Your browser can\'t handle this script');
+}
+
+xmlDoc.load( 'php.definition.xml' );
+
+var lexems = [];
+
+function doIt( id )
+{
+	
+	var lexer = { 
+		'n'	: 'text',
+		'p'	: null
+	};
+	lexer.c = TAP_Lexer_Build( xmlDef, '', lexer );
+	
+	document.getElementById( 'txt' ).value = TAP_Lexer_Serialize( lexer, 'php', [] );
+
+	var ul = document.getElementById('UL');
+	var nested = {};
+	var classes = '';
+	
+	var src = document.getElementById( id ).value;
+	
+	var r = lexer;
+	var txtLines = src.split(/\r\n|\r|\n/);
+	for (var i=0; i<txtLines.length; i++)
+	{
+		lexems = [];
+		r = TAP_Lexer_Scan( r, txtLines[i], addLexem );
+		
+		var li = document.createElement('LI');
+		var lastPos = 0;
+				
+		for (var j=0; j<lexems.length; j++)
+		{
+			if (lastPos < lexems[j].pos)
+			{
+				var span = document.createElement('SPAN');
+				span.appendChild( document.createTextNode( txtLines[i].substring( lastPos, lexems[j].pos ) ) );
+				span.className = classes + 'text';
+				li.appendChild( span );
+			}
+			lastPos = lexems[j].pos + lexems[j].length;
+			
+			var span = document.createElement('SPAN');
+			
+			if (! nested[lexems[j].name]) nested[lexems[j].name] = 0;
+			if (lexems[j].extra == '<')
+			{
+				span.className = classes + lexems[j].name + '_start';
+				nested[ lexems[j].name ]++
+			}
+			else if (lexems[j].extra == '>')
+			{
+				span.className = classes + lexems[j].name + '_end';
+				nested[ lexems[j].name ]--	
+			}	
+			else
+			{
+				span.className = classes + lexems[j].name;
+			}
+					
+			span.appendChild( document.createTextNode( txtLines[i].substr( lexems[j].pos, lexems[j].length ) ) );
+			li.appendChild( span );
+			
+			var classes = '';
+			for (var k in nested)
+			{
+				if (nested[k])
+					classes += k + ' ';
+			}
+		}
+		
+		if (lastPos < txtLines[i].length)
+		{
+			var span = document.createElement('SPAN');
+			span.className = classes + 'text';
+			span.appendChild( document.createTextNode( txtLines[i].substring( lastPos ) ) );
+			li.appendChild( span );
+		}
+
+		ul.appendChild( li );
+	}
+}
+
+
+
+function initializeJavaScriptBenchmark( what )
+{
+	if( !document.timeStamps )
+		document.timeStamps = []
+	if( !document.timeStamps[ what ] )
+		document.timeStamps[ what ] = [ 0, 0, 0, 0 ]
+	document.timeStamps[ what ][ 0 ] -= (new Date()).valueOf()+0*(document.timeStamps[ what ][ 3 ]=1)
+}
+function updateJavaScriptBenchmark( what )
+{
+	return ( !document.timeStamps || !document.timeStamps[ what ]  || !document.timeStamps[ what ][3] )?-1:document.timeStamps[ what ][ 2 ] = Math.round( 100*(document.timeStamps[ what ][ 0 ] += (new Date()).valueOf() ) / ++document.timeStamps[ what ][ 1 ] )/100+(document.timeStamps[ what ][ 3 ]=0)
+}
+function javaScriptBenchmark( what, reportHandle )
+{
+	initializeJavaScriptBenchmark( what.toString() )
+	typeof(what)=='function'?what():eval( what )
+	updateJavaScriptBenchmark( what.toString() )
+
+	var report = ""
+	for( currentWhat in document.timeStamps )
+	report += document.timeStamps[ currentWhat ][ 1 ]?currentWhat +"\n________________________________________\ntook in average ~"+ document.timeStamps[ currentWhat ][ 2 ] +"ms after "+ document.timeStamps[ currentWhat ][ 1 ] +" execution(s)\n\n\n":""
+	!reportHandle?alert( report ):reportHandle.innerHTML = report.replace( /\n________________________________________\n/g, "<hr/>" ).replace( /\t/g, "&nbsp; &nbsp; &nbsp;" ).replace( /\n/g, "<br/>" )
+}
+</script>
+
+<style type="text/css">
+.source textarea {
+	display: none;
+}
+
+#UL {
+	list-style:none;
+	margin: 0;
+	padding: 0;
+	font-family: courier new;
+	white-space: pre;
+}
+
+.PHP_start, .PHP_end {
+	color: red;
+	font-weight: bold;
+}
+.Comment_start, .Comment_end, .Comment {
+	color: gray;
+}
+.DoubleQuoteString_start, .DoubleQuoteString_end, .DoubleQuoteString,
+.SingleQuoteString_start, .SingleQuoteString_end, .SingleQuoteString,
+.HeredocString_start, .SingleQuoteString_end, .SingleQuoteString {
+	color: green;
+}
+.Variable {
+	color: blue;
+}
+.Number {
+	color: red;
+}
+.Ident {
+	color: black;
+}
+</style>
+</head>
+<body>
+
+<div class="source">
+	<a href="javascript:javaScriptBenchmark('doIt(\'xml\')', document.getElementById('out'))">XML</a>
+	<textarea id="xml"><![[CDATA[
+<?xml version="1.0" encoding="UTF-8"?>
+<definition lang="XML">
+
+	<templates>	
+		<template id="XML_Entities">
+			<rule name="Entity" start="&amp;[A-Za-z]+;" />
+			<rule name="Unicode" start="&amp;#[0-9]+;" />
+		</template>
+		<template id="XML_Attributes">
+			<rule name="Attribute" start="[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*" />
+			<rule name="Operator" start="=" />
+			<rule name="Value" start="([&quot;|'])" end="#BACKREF1#">
+				<template ref="XML_Entities" />
+			</rule>		
+		</template>		
+	</templates>
+	
+	<!-- Order of the rules matters -->	
+	<rules>
+		<rule name="Pi" start="&lt;\?[A-Za-z_]+[A-Za-z0-9_]*" end="\?>">
+			<template ref="XML_Attributes" />
+		</rule>
+		
+		<rule name="Comment" start="&lt;!--" end="-->" />
+		
+		<rule name="CData" start="&lt;!\[CDATA\[" end="\]\]>" />
+		
+		<rule name="ConditionStart" start="&lt;!\[[^\s\[]+\[" />
+		<rule name="ConditionEnd" start="\]\]>" />
+
+		<rule name="Definition" start="&lt;![A-Za-z]+" end=">">
+			<rule name="String" start="([&quot;|'])" end="#BACKREF1#" />		
+		</rule>
+				
+		<rule name="TagStart" start="&lt;[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*" end=">">
+			<template ref="XML_Attributes" />
+		</rule>
+		
+		<template ref="XML_Entities" />
+		
+		<rule name="TagEnd" start="/>|&lt;\/[A-Za-z_]+[A-Za-z0-9_]*\:?[A-Za-z_]+[A-Za-z0-9_]*>" />
+	</rules>
+	
+	<tests>	
+	</tests>
+</definition>	
+	]]></textarea>
+</div>
+
+<div class="source">
+	<a href="javascript:javaScriptBenchmark('doIt(\'php\')', document.getElementById('out'))">PHP</a>
+	<textarea id="php">
+&lt;?php
+include_once 'FLV/FLV.php';
+
+class MyFLV extends FLV {
+	
+	/**
+	 * On audio-only files the frame index will use this as minimum gap 
+	 */
+	private $audioFrameGap = 3;
+	
+	private $origMetaOfs = 0;
+	private $origMetaSize = 0;
+	private $origMetaData;
+	private $compMetaData;
+	
+	
+	function computeMetaData()
+	{
+		$this->compMetaData = array();
+		$this->compMetaData['metadatacreator'] = 'FLV Tools for PHP v0.1 by DrSlump';
+		$this->compMetaData['metadatadate'] = gmdate('Y-m-d\TH:i:s') . '.000Z';
+		$this->compMetaData['keyframes'] = array();
+		$this->compMetaData['keyframes']['filepositions'] = array();
+		$this->compMetaData['keyframes']['times'] = array();
+		
+		$this->origMetaOfs = 0;
+		$this->origMetaSize = 0;
+		$this->origMetaData = null;
+		
+		$skipTagTypes = array();
+		while ($tag = $this->getTag( $skipTagTypes ))
+		{
+			// pre-calculate the timestamp as seconds
+	    	$ts = number_format($tag->timestamp/1000, 3);
+	    
+	    	if ($tag->timestamp > 0)
+		    	$this->compMetaData['lasttimestamp'] = $ts;
+	    
+	    	switch ($tag->type)
+	    	{
+	        	case FLV_Tag::TYPE_VIDEO :
+	        	        	
+	           		//Optimization, extract the frametype without analyzing the tag body
+	           		if ((ord($tag->body[0]) >> 4) == FLV_Tag_Video::FRAME_KEYFRAME)
+	           		{   
+						$this->compMetaData['keyframes']['filepositions'][] = $this->getTagOffset();
+						$this->compMetaData['keyframes']['times'][] = $ts;
+	           		}
+	           	
+	            	if ( !in_array(FLV_TAG::TYPE_VIDEO, $skipTagTypes) )
+	            	{
+	                	$this->compMetaData['width'] = $tag->width;
+	                	$this->compMetaData['height'] = $tag->height;
+	                	$this->compMetaData['videocodecid'] = $tag->codec;
+						//Processing one video tag is enough               
+	            		array_push( $skipTagTypes, FLV_Tag::TYPE_VIDEO );
+	            	}
+	            
+	        		break;
+	        	
+	        	case FLV_Tag::TYPE_AUDIO :
+	        	
+					//Save audio frame positions when there is no video 
+	        		if (!$flv->hasVideo && $ts - $oldTs > $this->audioFrameGap)
+	        		{
+		        		$this->compMetaData['keyframes']['filepositions'][] = $this->getTagOffset();
+		        		$this->compMetaData['keyframes']['times'][] = $ts;
+		        		$oldTs = $ts;
+	        		}
+	        	
+	            	if ( !in_array( FLV_Tag::TYPE_AUDIO, $skipTagTypes) )  
+	            	{
+		            	$this->compMetaData['audiocodecid'] = $tag->codec;
+		            	$this->compMetaData['audiofreqid'] = $tag->frequency;
+		            	$this->compMetaData['audiodepthid'] = $tag->depth;
+		            	$this->compMetaData['audiomodeid'] = $tag->mode;
+		            
+						//Processing one audio tag is enough
+	            		array_push( $skipTagTypes, FLV_Tag::TYPE_AUDIO );
+	            	}
+					
+	        		break;
+					
+	        	case FLV_Tag::TYPE_DATA :
+	            	if ($tag->name == 'onMetaData')
+	            	{
+	            		$this->origMetaOfs = $this->getTagOffset();
+	            		$this->origMetaSize = $tag->size + self::TAG_HEADER_SIZE;
+	            		$this->origMetaData = $tag->value;
+	            	}
+	        		break;
+	    	}
+	    
+	    	//Does this actually help with memory allocation?
+	    	unset($tag);
+		}
+		
+		if (! empty($this->compMetaData['keyframes']['times']))
+			$this->compMetaData['lastkeyframetimestamp'] = $this->compMetaData['keyframes']['times'][ count($this->compMetaData['keyframes']['times'])-1 ];
+	
+		$this->compMetaData['duration'] = $this->compMetaData['lasttimestamp'];
+		
+		return $this->compMetaData;
+	}
+	
+	function setMetaData( $metadata, $origMetaOfs = 0, $origMetaSize = 0 )
+	{
+		$this->compMetaData = $metadata;
+		$this->origMetaOfs = $origMetaOfs;
+		$this->origMetaSize = $origMetaSize;
+	}
+	
+	function getMetaData()
+	{
+		if (! is_array($this->origMetaData))
+			return $this->compMetaData;
+		else
+			return array_merge( $this->origMetaData, $this->compMetaData );
+	}
+	
+	
+	function play( $from = 0 )
+	{
+		fseek($this->fp, 0);
+		
+		// get original file header just in case it has any special flag
+		echo fread($this->fp, $this->bodyOfs + 4);
+		
+		// output the metadata if available
+		$meta = $this->getMetaData();
+		if (! empty($meta))
+		{
+			//serialize the metadata as an AMF stream
+			include_once 'FLV/Util/AMFSerialize.php';
+			$amf = new FLV_Util_AMFSerialize();
+
+			$serMeta = $amf->serialize('onMetaData');
+			$serMeta.= $amf->serialize($meta);
+
+			//Data tag mark
+			$out = pack('C', FLV_Tag::TYPE_DATA);
+			//Size of the data tag (BUG: limited to 64Kb)
+			$out.= pack('Cn', 0, strlen($serMeta));
+			//Timestamp
+			$out.= pack('N', 0);
+			//StreamID
+			$out.= pack('Cn', 0, 0);
+			
+			echo $out;
+			echo $serMeta;
+			
+			// PrevTagSize for the metadata
+			echo pack('N', strlen($serMeta) + strlen($out) );
+		}
+		
+		$chunkSize = 4096;
+		$skippedOrigMeta = empty($this->origMetaSize);
+		while (! feof($this->fp))
+		{
+			// if the original metadata is pressent and not yet skipped...
+			if (! $skippedOrigMeta)
+			{				
+				$pos = ftell($this->fp);
+			
+				// check if we are going to output it in this loop step
+				if ( $pos &lt;= $this->origMetaOfs &&
+					 $pos + $chunkSize > $this->origMetaOfs )
+				{
+					// output the bytes just before the original metadata tag
+					if ($this->origMetaOfs - $pos > 0)
+						echo fread($this->fp, $this->origMetaOfs - $pos);
+					
+					// position the file pointer just after the metadata tag
+					fseek($this->fp, $this->origMetaOfs + $this->origMetaSize);
+					
+					$skippedOrigMeta = true;
+					continue;
+				}
+			}
+			
+			echo fread($this->fp, $chunkSize);
+		}
+	}
+}
+
+
+
+$flv = new MyFLV();
+try {
+	$flv->open( 'samples/video_vp6.flv' );
+} catch (Exception $e) {
+	die("<pre>The following exception was detected while trying to open a FLV file:\n" . $e->getMessage() . "</pre>");
+}
+
+//Here we should cache the result and use ->setMetaData() instead
+$start = microtime(true);
+$flv->computeMetaData();
+$end = microtime(true);
+echo "&lt;hr/>EXTRACT METADATA PROCESS TOOK " . number_format(($end-$start), 2) . " seconds&lt;br/>";
+echo "&lt;pre>" . print_r($flv->getMetaData(), true) . "&lt;/pre>";
+
+//header('Content-type: flv-application/octet-stream');
+//header('Content-Disposition: attachment; filename="out.flv"');
+//$flv->play(0);
+
+$flv->close();	
+
+?&gt;	
+	</textarea>
+</div>
+
+<div id="out"></div>
+<textarea id="txt" cols="100"></textarea>
+
+
+<ul id="UL">
+</ul>
+
+
+</body>
+</html>

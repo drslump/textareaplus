@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definition lang="JavaScript">
+
+	<templates>
+	</templates>
+	
+	<!-- Order of the rules matters -->	
+	<rules>
+		<rule name="SingleLineComment" start="\/\/.*?$" />
+		<rule name="MultiLineComment" start="\/\*" end="\*\/" />
+
+		<!-- match single or double quoted strings supporting \' \" and multiline with ending \ -->
+		<rule name="SingleQuoteString" start="([&quot;'])" end="#BACKREF1#|$">
+			<rule name="BackslashMultiline" start="\\$" />
+			<rule name="BackslashOctal" start="\\[0-7]{1,3}" />
+			<rule name="BackslashHex" start="\\x[0-9A-Fa-f]{2}" />
+			<rule name="BackslashUnicode" start="\\u[0-9A-Fa-f]{4}" />
+			<!-- match \', \", \\, \t ... -->
+			<rule name="Backslash" start="\\." />
+		</rule>
+
+		<!-- Number -->
+		<rule name="NumberHex" start="\b[+-]?0[Xx][0-9A-Fa-f]+\b" />
+		<rule name="NumberFloat" start="\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b" />
+		<rule name="NumberInt" start="\b[+-]?[0-9]+\b" />
+	
+		<!-- Operators -->
+		<rule name="Operator" start=">=|&lt;=|===|==|\+=|-=|\*=|\/=|\!==|\!=|&amp;&amp;|\|\||[\!\{\}\[\]\(\)\=>&lt;\?\:\-\+\*\/\.\&amp;\|]" />
+	
+		<!-- Idents -->
+		<rule name="Ident" start="[A-Za-z_\$]+[A-Za-z0-9_\$]*" />
+	</rules>
+	
+	<tests>	
+		<test>
+			<payload><![CDATA[
+var foo = "Hello World";			
+			]]></payload>
+			<result>
+				<assert rule="Ident" offset="0" length="3" />
+				<assert rule="Operator" offset="4" length="1" />
+				<assert rule="DoubleQuoteString" extra="open" offset="6" length="1" />
+				<assert rule="DoubleQuoteString" extra="close" offset="18" length="1" />
+			</result>
+		</test>
+	</tests>
+</definition>

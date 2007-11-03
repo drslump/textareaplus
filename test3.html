@@ -1,0 +1,454 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Insert title here</title>
+
+<script language="javascript">
+
+
+function HL_Context( name, startRule, endRule, rules ) 
+{
+	this.name = name;
+	
+	if (typeof(startRule) == 'function')
+		this.re = String(startRule).substr(1, String(startRule).length-2);
+	else
+		this.re = startRule;
+	
+	// find capturing parenthesis by removing the escaped backslashes first...
+	var reStr = this.re.replace(/\\\\/g, '');
+	// and get all non-escaped parenthesis not followed by a question mark
+	var result = reStr.match( /([^\\]|^)\(([^\?]|$)/g );
+	if (result)
+		this.parenthesis = result.length;
+	else
+		this.parenthesis = 0;
+
+
+	if (typeof(endRule) == 'function')
+		this.endRe = String(endRule).substr(1, String(endRule).length-2);
+	else
+		this.endRe = endRule;
+	
+	this.rules = rules;
+}
+
+function HL_Token( name, rule )
+{
+	this.name = name;
+	
+	if (typeof(rule) == 'function')
+		this.re = String(rule).substr(1, String(rule).length-2);
+	else
+		this.re = rule;	
+}
+
+function HL_Keywords( name, rule, casesensitive, special, keywords )
+{
+	this.name = name;
+	
+	if (typeof(rule) == 'function')
+		this.re = String(rule).substr(1, String(rule).length-2);
+	else
+		this.re = rule;
+	
+		
+	// first we sort the keywords
+	keywords.sort();
+	// Now we reverse the previous sort so we have the keywords properly 
+	// ordered to build the regular expression
+	keywords.reverse();
+	
+	
+	// Optimize the keyword list by finding common prefixes. This could be implemented much better
+	// by weighting all the possibilities, instead it currently just match the first prefix found.
+	// i.e: mysql_connect, mysql_fetch_row, mysql_fetch_assoc, mysql_fetch_array
+	// becomes: mysql_(connect|fetch_row|fetch_assoc|fetch_array)
+	// instead of: mysql_connect|mysql_fetch_(row|assoc|array)
+	// or even: mysql_(connect|fetch_(row|assoc|array))
+
+	//TODO: Benchmark if the optimization is really somewhat faster
+	
+	var reStrings = [];
+	var bucket = [];
+	var prefix, count, size;
+	var optionalSuffix;
+	var escapeRe = /[\|\[\]\(\)\^\$\.\*\+\?\!\{\}\,\=\\]/g; //escapes regexp special chars
+	
+	for (var i=0; i<keywords.length; i++)
+	{
+		//console.log('Keyword: %s', keywords[i]);		
+		count = 1;
+		prefix = 0;
+		
+		while ( i+count < keywords.length )
+		{
+			lastPrefix = prefix;
+			
+			// find first different character starting from the left
+			prefix = Math.min( keywords[i].length, keywords[i+count].length );
+			for (var j=0; j<prefix; j++)
+			{
+				if ( keywords[i].charAt(j) != keywords[i+count].charAt(j) )
+				{
+					prefix = j;
+					break;
+				}
+			}
+
+			//console.log('  Current: %s, Count: %d, Prefix: %d', keywords[i+count], count, prefix);
+			
+			if ( prefix < 3 || lastPrefix-prefix > 2 )
+				break;
+			else
+				count++
+		}
+
+		if ( count > 2 )
+		{
+			optionalSuffix = false;
+			bucket = keywords.slice( i, i+count );
+			for (var j=0; j<bucket.length; j++)
+			{
+				bucket[j] = bucket[j].substr( lastPrefix ).replace( escapeRe, '\\$&' );
+				if ( !bucket[j].length )
+					optionalSuffix = true;
+			}
+			
+			
+			reStrings.push( keywords[i].substr(0, lastPrefix).replace( escapeRe, '\\$&' ) + '(?:' + bucket.join('|') + ')' + (optionalSuffix ? '?' : '') );
+		
+			//console.log('  PREFIX: %s, Keywords: %s', keywords[i].substr(0, lastPrefix), bucket);
+					
+			//skip already optimized items
+			i += count-1;
+		}
+		else
+		{ 
+			reStrings.push( keywords[i].replace( escapeRe, '\\$&' ) );
+		}
+	}
+	
+	this.keywords = new RegExp( ( '^(' + reStrings.join('|') + ')' + '$'), casesensitive ? '' : 'i' );
+	
+	//console.log('RE: %s', this.re);
+}
+
+
+function BuildLexer( definition, endRe, parent )
+{
+	function getObjectType( obj )
+	{
+		var arr = obj.constructor.toString().match( /function\s+([A-Z_]+[A-Z0-9_]*)\s*\(/i );
+		if (arr[1])
+			return arr[1].toLowerCase();
+		else
+			return false;
+	}
+		
+    var token;
+    var tokensReArr = [];
+    var tokenizer = {
+    	'parent'	: parent ? parent : null,
+    	're'		: null,
+    	'template'	: '',
+    	'tokens'	: []
+    };
+    
+    for (var i=0; i < definition.length; i++)
+    {
+    	token = {
+    		'name'			: definition[i].name,
+    		'prevContext'	: tokenizer,
+    		'nextContext'	: null,
+    		'parenthesis'	: 0,
+    		'keywords'		: null
+    	};
+    	
+    	switch ( getObjectType( definition[i] ) )
+    	{
+    		case 'hl_context':
+	    		token.parenthesis = definition[i].parenthesis;
+				token.nextContext = BuildLexer( definition[i].rules, definition[i].endRe, token );
+       		break;
+       		case 'hl_token':
+       		break;
+       		case 'hl_keywords':
+       			token.keywords = definition[i].keywords;
+       		break;
+       		default:
+       			alert('FATAL ERROR: The definition object seems to be corrupted');
+       	}
+       	
+		tokensReArr.push( definition[i].re );
+       	tokenizer.tokens.push( token );
+    }
+    
+	if (endRe)
+		tokensReArr.push( endRe );
+	
+	if (tokensReArr.length)
+	{
+		tokenizer.re = new RegExp( '(' + tokensReArr.join(')|(') + ')', 'g' );
+		tokenizer.template = '(' + tokensReArr.join(')|(') + ')';
+	}
+
+	return tokenizer;
+}
+
+
+
+// define some commonly used constructs
+// Note: Rules can be defined as a string or as a regexp literal WITHOUT modifiers
+
+// match a complex-parsing-variable like ${foo}, {$foo->bar}, ${foo['bar'][2]} ...
+var PHPComplexParsingVariable = new HL_Context( 'Variable', /(?:\$\{|\{\$)(?:[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(?:->)?)+/, /\}/,
+	[
+		// match single-quoted no-multiline strings supporting \'
+		new HL_Token( 'SingleQuoteString', /'[^'\\]*(?:\\.[^'\\]*)*'/ ),
+	]
+);
+
+// match a parsing-variable like $foo or $foo->bar
+var PHPSimpleParsingVariable = new HL_Token( 'Variable', /\$(?:[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(?:->)?)+/ );
+
+
+//Order matters! Keywords are ordered independently of context/tokens
+var HL_Definition_PHP = [
+	// single-line comments, either // or # style
+	new HL_Token( 'SingleLineComment', /(?:\/\/|#).*$/ ),
+	// multi-line comments
+	//new HL_Context( 'MultiLineComment', /\/\*/, /\*\//, [] ),
+	new HL_Context( 'MultiLineComment', /(\/)(\*)/, /#BACKREFERENCE2##BACKREFERENCE1#/, [] ),
+/*
+	// match double-quoted-strings with support for parsing variables
+	new HL_Context( 'DoubleQuoteString', /"/, /"/,
+		[
+			// match \", \$ and the like			
+			new HL_Token( 'Backslash', /\\./ ),
+			PHPComplexParsingVariable,
+			PHPSimpleParsingVariable
+			
+		]
+	),
+	// Heredoc strings
+	new HL_Context( 'HeredocString', /<<<([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\s*$/, /^#BACKREFERENCE1#;?$/, 
+		[
+			// match \$
+			new HL_Token( 'Backslash', /\\\$/ ),
+			PHPComplexParsingVariable,
+			PHPSimpleParsingVariable
+		]
+	),
+	// match single-quoted multiline strings supporting \'
+	new HL_Context( 'SingleQuoteString', /'/, /'/,
+		[
+			// match \'
+			new HL_Token( 'Backslash', /\\'/ )
+		]
+	),
+*/	
+	// Variables
+	new HL_Token( 'Variable', /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/ ),
+/*	
+	// Numbers
+	new HL_Token( 'NumberHex', /\b[+-]?0[Xx][0-9A-Fa-f]+\b/ ),
+	new HL_Token( 'NumberFloat', /\b[+-]?[0-9]*\.+[0-9]+(?:[Ee][+-]?[0-9]*)?\b/ ),
+	new HL_Token( 'NumberOctal', /\b[+-]?0[0-9]+\b/ ),
+	new HL_Token( 'NumberInt', /\b[+-]?[0-9]+\b/ ), 
+
+	// Operators
+	// TODO: optimize it by placing the single-char operators in a class [\.~<>]
+	new HL_Token( 'Operator', /~|\|\||\|\=|\||\^\=|\^|@|\?|>>\=|>>|>\=|>|\=\=\=|\=\=|\=|<\=|<<\=|<<|<|::|:|\/\=|\/|\.\=|\.|->|-\=|--|-|\+\=|\+\+|\+|\*\=|\*|&\=|&&|&|%\=|%\=|%|%|\!\=\=|\!\=|\!/ ),	
+		
+	// Control Structures
+	new HL_Keywords( 'ControlStructure', /\b[A-Za-z_]+\b/, false, 'b',
+		[ 
+			'if', 'else', 'elseif', 'endif', 'while', 'endwhile', 'do', 'for', 'endfor', 
+			'foreach', 'endforeach', 'break', 'continue', 'switch', 'endswitch', 'case', 
+			'default', 'as', 'declare', 'return', 'require', 'include', 'require_once', 
+			'include_once'
+		]
+	),
+
+	// Operators
+	new HL_Keywords( 'Operator', /\b[A-Za-z]+\b/, false, 'b',
+		[
+			'new',
+			'and', 'xor', 'or',
+			'instanceof',
+		]
+	),
+*/	
+	// Keywords
+	new HL_Keywords( 'Keyword', /\b[A-Za-z]+\b/, false, 'b',
+		[
+			'abstract', 'catch', 'class', 'const', 'extends', 'final', 'function', 'implements', 
+			'interface', 'new', 'self', 'static', 'parent', 'private', 'protected', 'public', 
+			'throw', 'try', 'var'
+		]
+	),
+	
+	// Idents
+	new HL_Token( 'Ident', /\b[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\b/ )	
+
+];
+
+var lexer = BuildLexer( HL_Definition_PHP );
+
+
+//console.log(lexer.toSource());
+
+
+
+
+function addToken( token, value )
+{
+	console.log('ADDTOKEN %s: %s', token.name, value);
+}
+
+
+
+/*
+	This alternative does not work!
+	The first captured parenthesis which matches stops the regexp so we cannot know
+	if another rule matches in the case that the matched text is not a keyword.
+*/
+function parseLine( src, token )
+{  
+    var escapeRe = /[\|\[\]\(\)\^\$\.\*\+\?\!\{\}\,\=\\]/g;
+    
+    var i;
+    var endPos = 0;
+    var pos = 0;
+    
+    var dinamic;
+    var newContext;
+    
+    //console.log( tknz.context.re.toSource() );
+      
+	//reset the regular expression
+    token.nextContext.re.lastIndex = 0;
+    // find next token
+    while ( (startMatch = token.nextContext.re.exec( src )) !== null )
+    {
+    	//console.log('RE: %s - StartMatch: %s', tknz.re, startMatch);
+    	dinamic = false;
+    	newContext = false;
+    	skipLoop = false;
+
+		if (endPos < startMatch.index)
+        {
+        	addToken( token, src.substring( endPos, startMatch.index ) );
+            console.log( 'UNMATCHED TEXT_%s_ %d: %s', token.name, endPos, src.substring( endPos, startMatch.index ) );
+            //console.log( token.nextContext.re.toSource() );
+        }
+                       
+    	pos = startMatch.index;
+        endPos = pos + startMatch[0].length;
+                
+		// loop thru the captured parenthesis
+        for (i=1, tkn=0; tkn < token.nextContext.tokens.length; i++, tkn++)
+        {    
+            // check the first capture parentesis which was matched
+            if (!skipLoop && startMatch[i])
+            {
+                // check if the token is a keyword
+                if (token.nextContext.tokens[tkn].keywords)
+                {
+                	console.log('Checking keywords %s for "%s" : %s', token.nextContext.tokens[tkn].name, startMatch[0], token.nextContext.tokens[tkn].keywords.toSource());
+                	console.log('tkn: %d i: %d re: %s', tkn, i, token.nextContext.re);
+                	console.log(startMatch);
+                	//token.nextContext.tokens[tkn].keywords.lastIndex = 0;
+                	if ( token.nextContext.tokens[tkn].keywords.test( startMatch[0] ) )
+                	{
+                		console.log('Keyword found!');
+                		addToken( token.nextContext.tokens[tkn], startMatch[0] );
+                		skipLoop = true;
+                	}
+                }
+                // check if the token has an end delimiter
+                else if (token.nextContext.tokens[tkn].nextContext)
+                {
+				    console.log('START OF CONTEXT FOUND (' + token.nextContext.tokens[tkn].name + ') : ' + startMatch[0]);
+
+	                addToken( token.nextContext.tokens[tkn], startMatch[0] );
+	                skipLoop = true;
+                    
+                    newContext = true;                    
+                    
+                    // we have matched a dinamic context, so we need to rebuild the escape rule
+                    if (token.nextContext.tokens[tkn].parenthesis)
+                    {
+                    	dinamic = token.nextContext.tokens[tkn].nextContext.template;
+                    	console.log('TEMPLATE: ' + dinamic);
+                    	for (var j=1; j<=token.nextContext.tokens[tkn].parenthesis; j++)
+                    	{
+                    		if (startMatch[i+j])
+                       			dinamic = dinamic.replace( '#BACKREFERENCE'+j+'#', startMatch[i+j].replace( escapeRe, '\\$&' ) );
+                    	}
+                    }
+                    
+                    // point the active tokenizer to the new context
+                    //token.context = token.context.tokens[tkn].children;
+                    token = token.nextContext.tokens[tkn];
+                    // if it's dinamic then we rebuild the regular expression
+                    if (dinamic)
+                    	token.nextContext.re = new RegExp( dinamic, 'g' );
+                    token.nextContext.re.lastIndex = endPos;
+                    
+                    console.log('RE: ' + token.nextContext.re);
+                }
+                else
+                {
+                	addToken( token.nextContext.tokens[tkn], startMatch[0] );
+	                skipLoop = true;
+                	                	
+                	console.log('TOKEN %s: %s', token.nextContext.tokens[tkn].name, startMatch[0]); 
+                }
+                //break;
+            }
+
+        	if (token.nextContext.tokens[tkn] && token.nextContext.tokens[tkn].parenthesis)
+        		i += token.nextContext.tokens[tkn].parenthesis;
+     	}
+        
+        // if none of the start tokens were matched, check if the end of context one was
+        if (!newContext && startMatch[i])
+        {
+            console.log('END OF CONTEXT FOUND: %s', startMatch[0]);
+            //blocks.push( new TAP_Buffer_Block( pos, state.slice(0,state.length) ) );
+                        
+            addToken( token, startMatch[0] );
+            
+            token = token.prevContext.parent;
+            token.nextContext.re.lastIndex = endPos;
+        }
+    }
+    
+    if ( endPos < src.length )
+    {
+       	addToken( token, src.substring( endPos ) );
+       	console.log( 'UNMATCHED TEXT %d: %s', endPos, src.substring( endPos ) );
+    }
+}
+
+var phpLexer = { 
+	'name': 'php',
+	'prevContext': null,
+	'nextContext': lexer	 
+};
+lexer.parent = phpLexer;
+
+//console.log( phpLexer );
+
+parseLine( '$var /* as */ function test();', phpLexer );
+//console.log( phpLexer.toSource() );
+</script>
+
+</head>
+<body>
+<div id="out"></div>
+</body>
+</html>
