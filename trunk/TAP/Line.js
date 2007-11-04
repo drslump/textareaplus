@@ -45,11 +45,18 @@ Arguments:
 TAP.Line = function ( /** TAP.Buffer */ buffer, /** String */ txt ) {
 
     this.buffer = buffer;
-
+    this.state = TAP.Line.NEW;
     this.indent = this.text = this.newLine = '';
 
     this.setRaw( typeof txt === 'string' ? txt : '' );
 }
+
+// Line states constants
+TAP.Line.NORMAL = 0;
+TAP.Line.CHANGED = 1;
+TAP.Line.NEW = 2;
+TAP.Line.REMOVED = 3;    
+
 
 /*
 Propery: getRaw
@@ -74,6 +81,9 @@ TAP.Line.prototype.setRaw = function( /** String */ txt ) {
     this.indent = m[1] ? m[1] : '';
     this.text = m[2] ? m[2] : '';
     this.newLine = m[3] ? m[3] : this.buffer.newLine;
+    
+    if (this.state === this.NORMAL)
+        this.state = this.CHANGED;
 }
 
 /*
@@ -102,9 +112,9 @@ TAP.Line.prototype.insert = function( /** String */ txt, /** Number */ pos ) {
     if (pos < this.indent.length) {        
         this.indent = this.indent.substr(0, pos);
         if ( (s = txt.match(/^\s+/)) ) {
-        	this.indent += s;
-        	txt = txt.substr( s.length );
-		}
+            this.indent += s;
+            txt = txt.substr( s.length );
+	}
         pos = 0;
     } else {        
         pos -= this.indent.length;
@@ -117,6 +127,9 @@ TAP.Line.prototype.insert = function( /** String */ txt, /** Number */ pos ) {
         this.text = s + this.text.substr(pos);
         
     }
+    
+    if (this.state === TAP.Line.NORMAL)
+        this.state = TAP.Line.CHANGED;
 }
 
 /*
@@ -146,6 +159,9 @@ TAP.Line.prototype.remove = function( /** Number */ pos, /** Number */ len ) {
         s += this.text.substr( pos, len );
         this.text = this.text.substr( 0, pos ) + this.text.substr( pos+len );
     }
+    
+    if (this.state === TAP.Line.NORMAL)
+        this.state = TAP.Line.CHANGED;
     
     return s;
 }

@@ -40,9 +40,8 @@ See Also:
 	
 Arguments:
     txt     - string: (optional) the initial contents for the buffer
-    lexer   - (optional) a lexer definition object
 */
-TAP.Buffer = function ( /** String */ txt, /** Object */ lexer ) {
+TAP.Buffer = function ( /** String */ txt ) {
 
     // Initialize some variables
     this.lines = [];
@@ -52,9 +51,6 @@ TAP.Buffer = function ( /** String */ txt, /** Object */ lexer ) {
     this.lexer = null;
     
     this.setContents( String(txt) );
-    
-    if (typeof lexer === 'object')
-        this.setLexer( lexer );
 }
 
 /*
@@ -65,7 +61,8 @@ TAP.Buffer.prototype.clear = function()
 {
     this.column = this.row = this.charCount = 0;    
     this.lines = [];
-	this.lines.push( new TAP.Line(this) );
+    // we need to have at least a line in the buffer
+    this.lines.push( new TAP.Line(this) );
 }
 
 /*
@@ -81,10 +78,10 @@ TAP.Buffer.prototype.setContents = function( /** String */ txt ) {
         m, l;
     
     this.clear();
-	this.lines = [];
+    this.lines = [];
     
-	if ( !txt.length )
-		txt = ' ';
+    if ( !txt.length )
+	txt = ' ';
 
     while ( (m = re.exec(txt)) !== null) {
         
@@ -105,12 +102,13 @@ Returns:
 */
 TAP.Buffer.prototype.getContents = function() {
     var i, s = '';
-        
+
     for (i=0; i<this.lines.length; i++) {
-        s += this.lines[i].getRaw();
+        if (this.lines[i].state !== TAP.Line.REMOVED)
+            s += this.lines[i].getRaw();
     }
 
-	return s;
+    return s;
 }
 
 /*
@@ -132,7 +130,14 @@ Returns:
     An integer with the number of lines
 */
 TAP.Buffer.prototype.getLineCount = function() {
-    return this.lines.length;
+    var i, j;
+    
+    for (i=0,j=0; i<this.lines.length; i++) {
+        if (this.lines[i].state !== TAP.Line.REMOVED)
+            j++;
+    }
+    
+    return j;
 }
 
 /*
@@ -147,13 +152,13 @@ Returns:
     true if the new position was set properly, false otherwise
 */
 TAP.Buffer.prototype.setCursor = function( /** Number */ row, /** Number */ col ) {
+    
     if (row < 0 || col < 0 || 
         row >= this.getLineCount() ||
         col > this.lines[row].getLength()) {
 	
-		console.log('ERROR SETTING CURSOR');
-			return false;
-	}
+	return false;
+    }
     
     this.row = row;
     this.column = col;
@@ -188,10 +193,36 @@ Returns:
     a TAP.Line object for the given line
 */
 TAP.Buffer.prototype.getLine = function( /** Number */ ln ) {
+    var i, j;
+    
     if (typeof ln === 'undefined')
         ln = this.row;
     
-    return this.lines[ln];
+    for (i=0,j=0; j<ln && i<this.lines.length; i++) {
+        if (this.lines[i].state !== TAP.Line.REMOVED)
+            j++;
+    }
+    
+    return this.lines[j];
+}
+
+/*
+Property: insertLine
+    Inserts a new line object at the given row
+    
+Arguments:
+    row     - An integer with the row where to insert the new line
+    line    - The TAP.Line object to add
+*/
+TAP.Buffer.prototype.insertLine = function( /** Number */ row, /** TAP.Line */ line ) {
+    var i, j;
+    
+    for (i=0,j=0; j<row && i<this.lines.length; i++) {
+        if (this.lines[i].state !== TAP.Line.REMOVED)
+            j++;
+    }
+    
+    this.lines.splice( j, 0, line );
 }
 
 /*
@@ -209,51 +240,51 @@ Returns:
 TAP.Buffer.prototype.insert = function( /** String */ txt ) {
     
     var re, m, l, 
-		remaining = '', 
-		col, 
-		row = this.row;
+        remaining = '', 
+        col, 
+	row = this.row;
     
     if ( txt.search(/[\r\n]/) !== -1 ) {
         row = this.row;
         re = /(.*?)(\r\n|\r|\n|$)/g;
         while ( (m = re.exec(txt)) !== null ) {
-			// if we have processed all the lines we exit the loop
-			if (!m[0].length) {
-				console.log(m);
-				break;
-			}
-	
-			l = this.getLine(row);
-			if (l.getLength()) {
+            // if we have processed all the lines we exit the loop
+            if (!m[0].length) {
+                console.log(m);
+                break;
+            }
+
+            l = this.getLine(row);
+            if (l.getLength()) {
                 console.log('Inserting text at row: ' + row);
                 remaining = l.remove( this.column, l.getLength() );
                 l.insert( m[1], this.column );
                 this.charCount += m[1].length;                
 
-				// set the new line defined in the inserted char
-				l.newLine = m[2];				
+		// set the new line defined in the inserted char
+		l.newLine = m[2];
             } else {
                 console.log('Continue inserting at row: ' + row + ' M0: ' + m[0].replace(/[\n\r]/, '#'));
-				l.setRaw( m[0] );
-				this.charCount += l.getLength;
+		l.setRaw( m[0] );
+		this.charCount += l.getLength;
             }
             
-			if (m[2]) {
-				console.log('Adding new line at row: ' + row);
-				l = new TAP.Line( this );
-				this.lines.splice( row+1, 0, l );
-	            row++;
-			}			
+            if (m[2]) {
+                console.log('Adding new line at row: ' + row);
+                l = new TAP.Line( this );
+                this.insertLine( row+1, l );
+                row++;
+            }	
         }
         
-		col = l.getLength();
+	col = l.getLength();
 
         // add the remaining text which was cutted when adding a new line
         if ( remaining.length ) {
-			console.log('Adding the remaining text at row: ' + row);
+            console.log('Adding the remaining text at row: ' + row);
             l = this.getLine(row);
             l.insert( remaining, l.getLength() );
-			col += remaining.length;
+            col += remaining.length;
         }
         
     } else {
@@ -263,7 +294,7 @@ TAP.Buffer.prototype.insert = function( /** String */ txt ) {
         col = this.column + txt.length;
     }    
 
-	return [ row, col ];
+    return [ row, col ];
 }
 
 /*
