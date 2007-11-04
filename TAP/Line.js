@@ -46,9 +46,9 @@ TAP.Line = function ( /** TAP.Buffer */ buffer, /** String */ txt ) {
 
     this.buffer = buffer;
     this.state = TAP.Line.NEW;
-    this.indent = this.text = this.newLine = '';
 
-    this.setRaw( typeof txt === 'string' ? txt : '' );
+    // indent, text, newLine are initialized in clear()    
+    this.setRaw( typeof txt === 'string' ? txt : '' );    
 }
 
 // Line states constants
@@ -65,7 +65,7 @@ Propery: getRaw
 Returns:
     A string with the full text of this line
 */
-TAP.Line.prototype.getRaw = function() {
+TAP.Line.prototype.getRaw = TAP.Line.prototype.toString = function() {
     return this.indent + this.text + this.newLine;
 }
 
@@ -78,6 +78,7 @@ Arguments:
 */
 TAP.Line.prototype.setRaw = function( /** String */ txt ) {
     var m = txt.match(/^(\s*)([^\r\n]*)(.*)$/m);
+
     this.indent = m[1] ? m[1] : '';
     this.text = m[2] ? m[2] : '';
     this.newLine = m[3] ? m[3] : this.buffer.newLine;
