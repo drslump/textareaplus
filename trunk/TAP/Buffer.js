@@ -45,12 +45,12 @@ TAP.Buffer = function ( /** String */ txt ) {
 
     // Initialize some variables
     this.lines = [];
-    this.column = this.row = this.charCount = 0;
+    
     this.tab = '   ';
     this.newLine = '\n';
-    this.lexer = null;
-    
-    this.setContents( String(txt) );
+
+    // column, row, charCount, dirty are initialized in the following function call
+    this.setContents( typeof(txt) === 'string' ? txt : '' );    
 }
 
 /*
@@ -59,10 +59,17 @@ Property: clear
 */
 TAP.Buffer.prototype.clear = function()
 {
-    this.column = this.row = this.charCount = 0;    
-    this.lines = [];
+    var i;
+    
+    this.column = this.row = this.charCount = 0;
+    
+    for (i=0; i<this.lines.length; i++) {
+        this.lines.state = TAP.Line.REMOVED;
+    }
+    
     // we need to have at least a line in the buffer
     this.lines.push( new TAP.Line(this) );
+    this.dirty = true;
 }
 
 /*
@@ -78,7 +85,8 @@ TAP.Buffer.prototype.setContents = function( /** String */ txt ) {
         m, l;
     
     this.clear();
-    this.lines = [];
+    // remove the blank line inserted by clear() since we are going to add lines
+    this.lines.pop();
     
     if ( !txt.length )
 	txt = ' ';
@@ -90,7 +98,9 @@ TAP.Buffer.prototype.setContents = function( /** String */ txt ) {
         this.charCount += l.getLength();
         
         this.lines.push(l);
-    }    
+    }
+    
+    this.dirty = true;
 }
 
 /*
@@ -100,7 +110,7 @@ Propery: getContents
 Returns:
     A string with the full contents of the buffer
 */
-TAP.Buffer.prototype.getContents = function() {
+TAP.Buffer.prototype.getContents = TAP.Buffer.prototype.toString = function() {
     var i, s = '';
 
     for (i=0; i<this.lines.length; i++) {
@@ -233,7 +243,16 @@ Arguments:
     idx     - An integer indicating the array index of the line to remove
 */
 TAP.Buffer.prototype.removeLine = function( /** Number */ idx ) {
-    this.lines.splice( idx, 1 );    
+    // lets do some clean up just in case it helps with garbage collection
+    this.lines[idx].buffer = null;
+    delete this.lines[idx];
+    this.lines.splice( idx, 1 );
+
+    // We have to be sure to have at least a blank line (which is not flagged as
+    // removed) in the buffer
+    if (!this.getLine(0)) {
+        this.lines.push( new TAP.Line(this) );
+    }
 }
 
 /*
@@ -249,7 +268,6 @@ Returns:
 	cursor position acordingly. 
 */
 TAP.Buffer.prototype.insert = function( /** String */ txt ) {
-    
     var re, m, l, 
         remaining = '', 
         col, 
@@ -305,6 +323,8 @@ TAP.Buffer.prototype.insert = function( /** String */ txt ) {
         this.charCount += this.getLine().insert( txt, this.column );
         col = this.column + txt.length;
     }    
+
+    this.dirty = true;
 
     return [ row, col ];
 }
@@ -381,7 +401,7 @@ TAP.Buffer.prototype.remove = function( /** Number */ length ) {
         }  
     }
     
-    console.log('Cursor: %d,%d', row,col);
-    
+    this.dirty = true;
+
     return coords;
 }
