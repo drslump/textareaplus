@@ -53,7 +53,12 @@ TAP.Renderer.TextArea = function( editor ) {
         var i, l,
             s = '',
             pos = 0;
-            
+        
+        var li, ul = document.getElementById('lines');
+        while (ul.firstChild) {
+            ul.removeChild( ul.firstChild );
+        }
+        
         for (i=0; i<buffer.lines.length; i++) {
             l = buffer.lines[i];
             if (l.state === TAP.Line.REMOVED) {
@@ -64,13 +69,21 @@ TAP.Renderer.TextArea = function( editor ) {
             
             if ( i < buffer.row )
                 pos += l.getLength() + 1;
-                
-            s += l.getRaw();
+            
+            s += l; // this actually calls l.toString which is an alias of l.getRaw
+            
+            li = document.createElement('LI');
+            li.appendChild(
+                document.createTextNode( l.getRaw().replace('\n', '\\n') )                    
+            );
+            ul.appendChild( li );
         }
         
         pos += buffer.column;
         
         area.value = s;
         area.setSelectionRange( pos, pos );
+        
+        buffer.dirty = false;
     }
 }

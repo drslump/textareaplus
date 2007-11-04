@@ -47,7 +47,7 @@ TAP.Line = function ( /** TAP.Buffer */ buffer, /** String */ txt ) {
     this.buffer = buffer;
     this.state = TAP.Line.NEW;
 
-    // indent, text, newLine are initialized in clear()    
+    // indent, text, eol are initialized in clear()    
     this.setRaw( typeof txt === 'string' ? txt : '' );    
 }
 
@@ -66,7 +66,7 @@ Returns:
     A string with the full text of this line
 */
 TAP.Line.prototype.getRaw = TAP.Line.prototype.toString = function() {
-    return this.indent + this.text + this.newLine;
+    return this.indent + this.text + this.eol;
 }
 
 /*
@@ -77,12 +77,12 @@ Arguments:
     txt     - A string with the new text for the line
 */
 TAP.Line.prototype.setRaw = function( /** String */ txt ) {
-    var m = txt.match(/^(\s*)([^\r\n]*)(.*)$/m);
+    var m = txt.match(/^([ \t]*)(.*?)(\r\n|\r|\n)?$/m);
 
     this.indent = m[1] ? m[1] : '';
     this.text = m[2] ? m[2] : '';
-    this.newLine = m[3] ? m[3] : this.buffer.newLine;
-    
+    this.eol = m[3] ? m[3] : '';//this.buffer.eol;
+
     if (this.state === this.NORMAL)
         this.state = this.CHANGED;
 }
@@ -104,12 +104,12 @@ Property: insert
     Inserts a new chunk of text into the line at the given position
 
 Arguments:
-    txt     - The string to insert
     pos     - An integer with the position where to start inserting
+    txt     - The string to insert
 */
-TAP.Line.prototype.insert = function( /** String */ txt, /** Number */ pos ) {    
+TAP.Line.prototype.insert = function( /** Number */ pos, /** String */ txt ) {    
     var s;
-    
+
     if (pos < this.indent.length) {        
         this.indent = this.indent.substr(0, pos);
         if ( (s = txt.match(/^\s+/)) ) {
@@ -120,7 +120,7 @@ TAP.Line.prototype.insert = function( /** String */ txt, /** Number */ pos ) {
     } else {        
         pos -= this.indent.length;
     }
-    
+        
     if (txt.length) {
         
         s = this.text.substr(0, pos);

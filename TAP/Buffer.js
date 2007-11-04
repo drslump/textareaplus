@@ -47,7 +47,7 @@ TAP.Buffer = function ( /** String */ txt ) {
     this.lines = [];
     
     this.tab = '   ';
-    this.newLine = '\n';
+    this.eol = '\n';
 
     // column, row, charCount, dirty are initialized in the following function call
     this.setContents( typeof(txt) === 'string' ? txt : '' );    
@@ -162,10 +162,13 @@ Returns:
     true if the new position was set properly, false otherwise
 */
 TAP.Buffer.prototype.setCursor = function( /** Number */ row, /** Number */ col ) {
+    var l = this.getLine(row);
     
-    if (row < 0 || col < 0 || 
-        row >= this.getLineCount() ||
-        col > this.lines[row].getLength()) {
+    if (typeof l === 'object' &&
+        row > 0 &&
+        col > 0 &&
+        row < this.getLineCount() &&
+        col <= l.getLength()) {
 	
 	return false;
     }
@@ -177,17 +180,29 @@ TAP.Buffer.prototype.setCursor = function( /** Number */ row, /** Number */ col 
 
 /*
 Property: moveCursor
-    Positions the buffer cursor based on the current position
+    Positions the buffer cursor based on the current position. If the final position
+    is out of bounds it will set the cursor to the nearest limit
     
 Arguments:
     rows    - An integer with the number of rows to move: negative goes up, positive down
     cols    - An integer with the number of cols to move: negative goes up, positive down
-
-Returns:
-    true on success, false on failure
 */
 TAP.Buffer.prototype.moveCursor = function( /** Number */ rows, /** Number */ cols ) {
-    return this.setCursor( this.row + rows, this.column + cols );    
+    
+    this.row += rows;
+    this.column += cols;
+    
+    if (this.row < 0) {
+        this.row = 0;
+    } else if (this.row >= this.getLineCount()) {
+        this.row = this.getLineCount()-1;
+    }
+    
+    if (this.column < 0) {
+        this.column = 0;
+    } else if (this.column > this.getLine(this.row).getLength()) {
+        this.column = this.getLine(this.row).getLength();
+    }    
 }
 
 
@@ -208,12 +223,15 @@ TAP.Buffer.prototype.getLine = function( /** Number */ ln ) {
     if (typeof ln === 'undefined')
         ln = this.row;
     
+    if (typeof this.lines[ln] === 'undefined')
+        return null;
+    
     for (i=0,j=0; j<ln && i<this.lines.length; i++) {
         if (this.lines[i].state !== TAP.Line.REMOVED)
             j++;
     }
     
-    return this.lines[j];
+    return this.lines[i];
 }
 
 /*
@@ -270,40 +288,38 @@ Returns:
 TAP.Buffer.prototype.insert = function( /** String */ txt ) {
     var re, m, l, 
         remaining = '', 
-        col, 
+        col = this.column,
 	row = this.row;
     
     if ( txt.search(/[\r\n]/) !== -1 ) {
-        row = this.row;
         re = /(.*?)(\r\n|\r|\n|$)/g;
         re.lastIndex = 0;
         while ( (m = re.exec(txt)) !== null ) {
             // if we have processed all the lines we exit the loop
             if (!m[0].length) {
-                console.log(m);
                 break;
             }
 
             l = this.getLine(row);
             if (l.getLength()) {
                 console.log('Inserting text at row: ' + row);
-                remaining = l.remove( this.column, l.getLength() );
-                l.insert( m[1], this.column );
+                remaining = l.remove( col, l.getLength() );
+                l.insert( this.column, m[1] );
                 this.charCount += m[1].length;                
 
-		// set the new line defined in the inserted char
-		l.newLine = m[2];
+                // set the new line defined in the inserted char
+                l.eol = m[2];
             } else {
                 console.log('Continue inserting at row: ' + row + ' M0: ' + m[0].replace(/[\n\r]/, '#'));
-		l.setRaw( m[0] );
-		this.charCount += l.getLength;
+                l.setRaw( m[0] );
+                this.charCount += l.getLength;
             }
             
             if (m[2]) {
                 console.log('Adding new line at row: ' + row);
-                l = new TAP.Line( this );
-                this.insertLine( row+1, l );
                 row++;
+                l = new TAP.Line( this );
+                this.insertLine( row, l );
             }	
         }
         
@@ -313,19 +329,21 @@ TAP.Buffer.prototype.insert = function( /** String */ txt ) {
         if ( remaining.length ) {
             console.log('Adding the remaining text at row: ' + row);
             l = this.getLine(row);
-            l.insert( remaining, l.getLength() );
-            col += remaining.length;
+            l.insert( l.getLength(), remaining );
+            //col += remaining.length;
         }
         
     } else {
         
         // simple char insertion
-        this.charCount += this.getLine().insert( txt, this.column );
+        this.charCount += this.getLine().insert( this.column, txt );
         col = this.column + txt.length;
     }    
 
     this.dirty = true;
-
+ 
+    console.log('Row: %d, Col: %d', row, col);
+ 
     return [ row, col ];
 }
 
@@ -338,39 +356,49 @@ Arguments:
               then the chars are removed backwards
 */
 TAP.Buffer.prototype.remove = function( /** Number */ length ) {
-    var l, coords,
-        len = length,
+    var l, nl, coords, lineLen, len,
         row = this.row,
         col = this.column;
     
-    if (len < 0) {
-        
-        console.log('Remove: Starting negative processing: row: %d, col: %d, length: %d', row, col, len);
-        
+    // we are going to handle negative lengths by calculating the top most coordinates
+    // and then follow a single code path to perform the removal
+    if (length < 0) {
         // make it a positive integer
-        len = -len;
-        
-        // find the line where to start removing
-        while( col-len < 0 ) {
-            
-            l = this.getLine( row-1 );
-            if (!l) {
-                console.log('Removing chars has reached the top of the buffer');
-                break;
-            }
-            
-            row--;
-            len -= col;
-            col = l.getLength() + 1;
-        }
-        
-        col -= len;
         length = -length;
         
-        console.log('Remove: Finished negative processing: row: %d, col: %d, length: %d', row, col, length);
+        console.log('Remove: Starting negative processing: row: %d, col: %d, length: %d', row, col, length);
+        
+        if ( col >= length ) {
+            
+            col -= length;
+            
+        } else {
+            
+            len = length;            
+            do {
+                len -= col;
+                
+                l = this.getLine(--row);
+                if (!l) {
+                    console.log('Removing chars has reached the top of the buffer');
+                    length -= len;
+                    row = len = 0;
+                    break;
+                }
+                col = l.getLength() + 1;
+            } while ( col < len );
+            col -= len; 
+        }
+        
+        console.log('Remove: Finished negative processing: row: %d, col: %d, length: %d', row, col, len);
     }
 
+    // store coordinates to return it at the end of the process
     coords = [ row, col ];
+
+    // mark the buffer as dirty since we have removed some chars
+    this.dirty = true;
+    
     
     while ( length > 0 ) {
         
@@ -380,28 +408,48 @@ TAP.Buffer.prototype.remove = function( /** Number */ length ) {
             break;
         }
         
-        len = l.getLength() + 1;
-
-        console.log('Remove: Removing: row: %d, col: %d, length: %d, line length: %d', row, col, length, len );
+        // get line length including the EOL
+        lineLen = l.getLength();
         
-        if ( len <= length-col ) {
-            
-            console.log('Remove: Removing line');
-            length -= len;
-            l.state = TAP.Line.REMOVED;
-            col = 0;
-            row++;
-            
+        console.log('Remove: Removing: row: %d, col: %d, length: %d, line length: %d', row, col, length, lineLen );
+        
+        // check if we just want to remove a chunk from the current line
+        if ( length <= (lineLen-col)) {
+        
+            l.remove( col, length );
+            break;
+        
+        // we have to remove stuff from the line below
         } else {
             
-            l.remove( col, length );
-            col = length;
-            length = 0;
+            // this is a special case, when we remove a whole line just mark it as
+            // removed from the buffer which is much faster
+            if ( !col ) {
+                l.state = TAP.Line.REMOVED;                
+            }   
+            // if we need to keep a portion of the current line
+            else {
+                // remove the part not needed from the line
+                l.remove( col, lineLen-col );
+                
+                // append the line below to the current line
+                nl = this.getLine( row+1 );
+                if ( nl ) {
+                    l.eol = nl.eol;
+                    l.insert( col, nl.indent + nl.text );
+                    console.log('NL: "%s" "%s"', nl.indent.replace(/[\r\n]/, '#'), nl.text)
+                    nl.state = TAP.Line.REMOVED;
+                    row++;
+                } else {
+                    l.eol = '';
+                    break;
+                }
+            }
             
-        }  
+            length -= lineLen - col + 1;
+        }
     }
     
-    this.dirty = true;
 
     return coords;
 }

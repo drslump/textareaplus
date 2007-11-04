@@ -51,7 +51,8 @@ function TAP() {
         Basically just takes care of calling the choosen renderer render function
     */
     this.render = function() {
-        $this.renderer.render( $this.activeBuffer );
+        if ($this.activeBuffer.dirty)
+            $this.renderer.render( $this.activeBuffer );
     }
 
     /*
@@ -62,48 +63,58 @@ function TAP() {
         e       - the key event to analyze
     */
     this.keyHandler = function(e) {
+        var b = $this.activeBuffer;
     
         switch ( e.keyCode ) {
             
             case 8: // backspace
-                var pos = $this.activeBuffer.remove( -1 );
-                $this.activeBuffer.setCursor( pos[0], pos[1] );
+                //if (b.row || b.column) {
+                {
+                    var pos = b.remove( -1 );            
+                    b.setCursor( pos[0], pos[1] );
+                }
             break;
             case 46: // supr
-                var pos = $this.activeBuffer.remove( 1 );
-                //buffer.setCursor( pos[0], pos[1] );
+                b.remove( 1 );
             break;
+        
+            case 9: // tab
+                var pos = b.insert( b.tab );
+                b.setCursor( pos[0], pos[1] );
+            break;
+        
             case 13: // enter
-                var pos = $this.activeBuffer.insert( '\n' );
-                $this.activeBuffer.setCursor( pos[0], pos[1] );            
+                var pos = b.insert( b.eol );
+                console.log(pos);
+                b.setCursor( pos[0], pos[1] );            
             break;
         
             case 33: // pgUp
-                $this.activeBuffer.moveCursor( -20, 0 );
+                b.moveCursor( -20, 0 );
             break;
             case 34: // pgDown
-                $this.activeBuffer.moveCursor( 20, 0 );
+                b.moveCursor( 20, 0 );
             break;
         
             case 37: // left
-                $this.activeBuffer.moveCursor( 0, -1 );
-                console.log('%d,%d', $this.activeBuffer.row, $this.activeBuffer.column);
+                b.moveCursor( 0, -1 );
+                console.log('%d,%d', b.row, b.column);
             break;
             case 38: // up
-                $this.activeBuffer.moveCursor( -1, 0 );
+                b.moveCursor( -1, 0 );
             break;
             case 39: // right
-                $this.activeBuffer.moveCursor( 0, 1 );
+                b.moveCursor( 0, 1 );
             break;
             case 40: // down
-                $this.activeBuffer.moveCursor( 1, 0 );
+                b.moveCursor( 1, 0 );
             break;
         
             default:
                 if (e.charCode && !e.ctrlKey && !e.metaKey) {			
                     var s = String.fromCharCode(e.charCode);
-                    $this.activeBuffer.insert( s );
-                    $this.activeBuffer.moveCursor( 0, s.length );			
+                    b.insert( s );
+                    b.moveCursor( 0, s.length );			
                 } else {
                     console.log('keyCode: %d - charCode: %d', e.keyCode, e.charCode );
                 }             
