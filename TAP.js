@@ -40,6 +40,75 @@ Example:
 	(end)
 */
 function TAP() {
+
+    this.renderer = null;    
+    this.activeBuffer = null;
+
+    var $this = this;
+
+    /*
+    Property: render
+        Basically just takes care of calling the choosen renderer render function
+    */
+    this.render = function() {
+        $this.renderer.render( $this.activeBuffer );
+    }
+
+    /*
+    Property: keyHandler
+        To be used as a key event handler
     
+    Arguments:
+        e       - the key event to analyze
+    */
+    this.keyHandler = function(e) {
+    
+        switch ( e.keyCode ) {
+            
+            case 8: // backspace
+                var pos = $this.activeBuffer.remove( -1 );
+                $this.activeBuffer.setCursor( pos[0], pos[1] );
+            break;
+            case 46: // supr
+                var pos = $this.activeBuffer.remove( 1 );
+                //buffer.setCursor( pos[0], pos[1] );
+            break;
+            case 13: // enter
+                var pos = $this.activeBuffer.insert( '\n' );
+                $this.activeBuffer.setCursor( pos[0], pos[1] );            
+            break;
+        
+            case 33: // pgUp
+                $this.activeBuffer.moveCursor( -20, 0 );
+            break;
+            case 34: // pgDown
+                $this.activeBuffer.moveCursor( 20, 0 );
+            break;
+        
+            case 37: // left
+                $this.activeBuffer.moveCursor( 0, -1 );
+                console.log('%d,%d', $this.activeBuffer.row, $this.activeBuffer.column);
+            break;
+            case 38: // up
+                $this.activeBuffer.moveCursor( -1, 0 );
+            break;
+            case 39: // right
+                $this.activeBuffer.moveCursor( 0, 1 );
+            break;
+            case 40: // down
+                $this.activeBuffer.moveCursor( 1, 0 );
+            break;
+        
+            default:
+                if (e.charCode && !e.ctrlKey && !e.metaKey) {			
+                    var s = String.fromCharCode(e.charCode);
+                    $this.activeBuffer.insert( s );
+                    $this.activeBuffer.moveCursor( 0, s.length );			
+                } else {
+                    console.log('keyCode: %d - charCode: %d', e.keyCode, e.charCode );
+                }             
+        }
+    };
+
 
 }
