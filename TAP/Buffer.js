@@ -165,17 +165,17 @@ TAP.Buffer.prototype.setCursor = function( /** Number */ row, /** Number */ col 
     var l = this.getLine(row);
     
     if (typeof l === 'object' &&
-        row > 0 &&
-        col > 0 &&
+        row >= 0 &&
+        col >= 0 &&
         row < this.getLineCount() &&
         col <= l.getLength()) {
 	
-	return false;
+	this.row = row;
+	this.column = col;
+	return true;
     }
     
-    this.row = row;
-    this.column = col;
-    return true;
+    return false;
 }
 
 /*
@@ -202,9 +202,10 @@ TAP.Buffer.prototype.moveCursor = function( /** Number */ rows, /** Number */ co
         this.column = 0;
     } else if (this.column > this.getLine(this.row).getLength()) {
         this.column = this.getLine(this.row).getLength();
-    }    
+    }
+    
+    console.log('moveCursor: %d,%d', this.row, this.column );
 }
-
 
 /*
 Property: getLine
@@ -316,6 +317,7 @@ TAP.Buffer.prototype.insert = function( /** String */ txt ) {
             }
             
             if (m[2]) {
+		console.log(m);
                 console.log('Adding new line at row: ' + row);
                 row++;
                 l = new TAP.Line( this );
@@ -448,8 +450,8 @@ TAP.Buffer.prototype.remove = function( /** Number */ length ) {
             
             length -= lineLen - col + 1;
         }
-    }
-    
+    }    
 
     return coords;
 }
+
